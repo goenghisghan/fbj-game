@@ -14,7 +14,9 @@ FPL_FIXTURES = "https://fantasy.premierleague.com/api/fixtures/"
 
 HEADERS = {
     "User-Agent": "Dalvik/2.1.0 (Linux; U; Android 5.1; PRO 5 Build/LMY47D)",
-    "accept-language": "en"
+    "accept-language": "en",
+    "Content-Type": "application/x-www-form-urlencoded",
+    "Accept": "application/json"
 }
 
 session = requests.session()
@@ -46,6 +48,7 @@ def fpl_login():
         print("✅ Logged in, access token acquired")
     except Exception as e:
         print("⚠️ Failed to parse login response:", e)
+        print("Login raw response snippet:\n", r.text[:500])
 
 def safe_get_json(url, timeout=20):
     """Fetch JSON from FPL API with Bearer token headers."""
