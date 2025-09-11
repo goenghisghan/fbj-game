@@ -1,0 +1,41 @@
+{% extends "base.html" %}{% block content %}
+<h2>League Table</h2>
+<table class="table">
+  <thead><tr><th>Rank</th><th>User</th><th>Total League Pts</th><th>Avg GW Pts</th></tr></thead>
+  <tbody>
+  {% for row in league_rows %}
+    <tr>
+      <td>{{ loop.index }}</td>
+      <td>{{ row.username }}</td>
+      <td>{{ row.total_lp }}</td>
+      <td>{{ "%.2f"|format(row.avg_gw) }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+<h3 style="margin-top:24px">Gameweek History Viewer</h3>
+<form method="GET" style="margin-bottom:10px">
+  <label>Gameweek:
+    <select name="gw" onchange="this.form.submit()">
+      {% for ev in all_gws %}
+        <option value="{{ ev.id }}" {% if ev.id == selected_gw %}selected{% endif %}>GW {{ ev.id }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  {% if can_finalize %}
+    <button class="btn btn-secondary" formaction="{{ url_for('finalize_gw') }}" formmethod="post">Finalize This GW</button>
+  {% endif %}
+</form>
+<table class="table">
+  <thead><tr><th>User</th><th>GW Points</th><th>League Points</th></tr></thead>
+  <tbody>
+  {% for r in history_rows %}
+    <tr>
+      <td>{{ r.username }}</td>
+      <td>{{ r.display_points }}</td>
+      <td>{{ r.league_points }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

@@ -1,0 +1,63 @@
+{% extends "base.html" %}{% block content %}
+<h2>Pick Team</h2>
+<div class="grid">
+{% for pos in ["GK","DEF","MID","FWD"] %}{% set p = selected[pos] %}
+<div class="card player-card">
+  <div class="player-pos">{{ pos }}</div>
+  {% if p %}
+    {% if p.kit_url %}<img class="kit-img" src="{{ p.kit_url }}" alt="{{ p.team_name }} badge">{% endif %}
+    <div style="font-weight:700">{{ p.first_name }} {{ p.second_name }}</div>
+    <div class="meta">{{ p.team_name }}</div>
+    <button class="btn btn-danger" style="margin-top:8px" onclick="removePlayer('{{ pos }}')">Remove</button>
+  {% else %}
+    <div class="meta">Empty</div>
+  {% endif %}
+</div>{% endfor %}
+</div>
+<button class="btn btn-danger" style="margin-top:10px" onclick="clearAll()">Clear All</button>
+<form method="GET" class="filters">
+  <label>Club <select name="club" onchange="this.form.submit()">
+    <option value="">All</option>{% for c in clubs %}
+      <option value="{{ c }}" {% if request.args.get('club')==c %}selected{% endif %}>{{ c }}</option>
+    {% endfor %}</select></label>
+  <label>Position <select name="position" onchange="this.form.submit()">
+    <option value="">All</option>{% for p in ['GK','DEF','MID','FWD'] %}
+      <option value="{{ p }}" {% if request.args.get('position')==p %}selected{% endif %}>{{ p }}</option>
+    {% endfor %}</select></label>
+</form>
+<table class="table">
+<thead><tr><th>Name</th><th>Club</th><th>Position</th><th>Total Points</th><th>Next Opp</th><th>Pick</th></tr></thead>
+<tbody>{% for player in players %}
+{% set club_taken = player.team_name in selected_clubs %}
+<tr><td>{{ player.first_name }} {{ player.second_name }}</td>
+<td>{{ player.team_name }}</td>
+<td>{{ player.position_name }}</td>
+<td>{{ player.total_points }}</td>
+<td>{{ player.next_opp }}</td>
+<td>
+{% if selected[player.position_name] or club_taken %}
+  <button class="btn" disabled>Pick</button>
+{% else %}
+  <button class="btn" type="button" onclick="pickPlayer('{{ player.position_name }}', {{ player.id }})">Pick</button>
+{% endif %}
+</td></tr>
+{% endfor %}</tbody></table>
+<div class="pagination">{% set qclub = request.args.get('club') or '' %}{% set qpos = request.args.get('position') or '' %}
+{% if current_page>1 %}<a href="?page={{ current_page-1 }}&club={{ qclub }}&position={{ qpos }}">Previous</a>{% endif %}
+ Page {{ current_page }} of {{ total_pages }}
+{% if current_page<total_pages %}<a href="?page={{ current_page+1 }}&club={{ qclub }}&position={{ qpos }}">Next</a>{% endif %}</div>
+<script>
+async function pickPlayer(position, playerId){
+  const res=await fetch("{{ url_for('pick_player') }}",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({position,player_id:playerId})});
+  if(res.ok) location.reload();
+}
+async function removePlayer(position){
+  const res=await fetch("{{ url_for('remove_player') }}",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({position})});
+  if(res.ok) location.reload();
+}
+async function clearAll(){
+  const res=await fetch("{{ url_for('clear_team') }}",{method:"POST"});
+  if(res.ok) location.reload();
+}
+</script>
+{% endblock %}
