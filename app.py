@@ -102,7 +102,15 @@ def fpl_login():
             "eventName": "continue",
         },
     )
-    dv_response = r4.json()["dvResponse"]
+   r4_json = r4.json()
+    if "dvResponse" not in r4_json:
+        print("⚠️ Login step did not return dvResponse. Full JSON:", r4_json)
+        return
+    dv_response = r4_json["dvResponse"]
+except Exception:
+    print("⚠️ Login step did not return JSON. Raw response:", r4.text[:500])
+    return
+
 
     # Step 4: Resume
     r5 = session.post(
