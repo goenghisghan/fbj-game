@@ -81,6 +81,7 @@ def fpl_login():
             "pollProps": {"status": "continue", "delayInMs": 10, "retriesAllowed": 1, "pollChallengeStatus": False},
         },
     )
+        
     r4 = session.post(
         URLS["login"],
         headers={"interactionId": interaction_id, "interactionToken": interaction_token},
@@ -102,15 +103,16 @@ def fpl_login():
             "eventName": "continue",
         },
     )
-   r4_json = r4.json()
-    if "dvResponse" not in r4_json:
-        print("⚠️ Login step did not return dvResponse. Full JSON:", r4_json)
-        return
-    dv_response = r4_json["dvResponse"]
-except Exception:
-    print("⚠️ Login step did not return JSON. Raw response:", r4.text[:500])
-    return
 
+    try:
+        r4_json = r4.json()
+        if "dvResponse" not in r4_json:
+            print("⚠️ Login step did not return dvResponse. Full JSON:", r4_json)
+            return
+        dv_response = r4_json["dvResponse"]
+    except Exception:
+        print("⚠️ Login step did not return JSON. Raw response:", r4.text[:500])
+        return
 
     # Step 4: Resume
     r5 = session.post(
