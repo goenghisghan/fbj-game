@@ -43,11 +43,15 @@ def fpl_login():
     r = session.post(LOGIN_URL, data=payload, headers=HEADERS)
     r.raise_for_status()
     print("✅ Logged in to FPL API")
+    print("Session cookies:", session.cookies.get_dict())
 
 def safe_get_json(url, timeout=20):
-    """Fetch JSON from FPL API with session + headers."""
+    """Fetch JSON from FPL API with session + headers, fallback retry without headers if 403."""
     try:
         r = session.get(url, headers=HEADERS, timeout=timeout)
+        if r.status_code == 403:
+            print(f"⚠️ 403 for {url} with headers, retrying without headers")
+            r = session.get(url, timeout=timeout)
         r.raise_for_status()
         return r.json()
     except Exception as e:
