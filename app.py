@@ -12,7 +12,6 @@ LOGIN_URL = "https://users.premierleague.com/accounts/login/"
 FPL_BOOTSTRAP = "https://fantasy.premierleague.com/api/bootstrap-static/"
 FPL_FIXTURES = "https://fantasy.premierleague.com/api/fixtures/"
 
-# Pretend to be the Android app (this is the trick!)
 HEADERS = {
     "User-Agent": "Dalvik/2.1.0 (Linux; U; Android 5.1; PRO 5 Build/LMY47D)",
     "accept-language": "en"
@@ -21,7 +20,7 @@ HEADERS = {
 session = requests.session()
 
 def fpl_login():
-    """Login to FPL API using mobile app style headers."""
+    """Login to FPL API and store Bearer access token for all requests."""
     email = os.environ.get("FPL_EMAIL", "")
     password = os.environ.get("FPL_PASSWORD", "")
     if not email or not password:
@@ -36,11 +35,20 @@ def fpl_login():
     }
     r = session.post(LOGIN_URL, data=payload, headers=HEADERS)
     r.raise_for_status()
-    print("✅ Logged in with Android-style headers")
-    print("Session cookies:", session.cookies.get_dict())
+
+    try:
+        resp_json = r.json()
+        token = resp_json.get("access_token")
+        if not token:
+            print("⚠️ No access token in login response:", resp_json)
+            return
+        HEADERS["X-API-Authorization"] = f"Bearer {token}"
+        print("✅ Logged in, access token acquired")
+    except Exception as e:
+        print("⚠️ Failed to parse login response:", e)
 
 def safe_get_json(url, timeout=20):
-    """Fetch JSON from FPL API with Android-style headers + logged-in session."""
+    """Fetch JSON from FPL API with Bearer token headers."""
     try:
         r = session.get(url, headers=HEADERS, timeout=timeout)
         r.raise_for_status()
