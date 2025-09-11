@@ -1,9 +1,9 @@
-import os, requests, json, sqlite3
+import os, json, sqlite3, requests
 from flask import Flask, render_template, request, redirect, url_for, session as flask_session, flash
 from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", "dev")
+app.secret_key = os.getenv("SECRET_KEY", "dev")
 
 DB_PATH = "users.db"
 
@@ -21,17 +21,10 @@ def get_tokens_from_gist():
     r.raise_for_status()
     gist_data = r.json()
 
-    # Take the first file in the gist
     file_content = list(gist_data["files"].values())[0]["content"]
     tokens = json.loads(file_content)
 
-    access_token = tokens.get("access_token")
-    refresh_token = tokens.get("refresh_token")
-    if access_token:
-        print("✅ Loaded access token from Gist")
-    else:
-        print("⚠️ No access token found in Gist")
-    return access_token, refresh_token
+    return tokens.get("access_token"), tokens.get("refresh_token")
 
 
 ACCESS_TOKEN, REFRESH_TOKEN = get_tokens_from_gist()
@@ -52,11 +45,28 @@ def db():
 def init_db():
     conn = db()
     cur = conn.cursor()
-    cur.execute("CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY, username TEXT UNIQUE, password TEXT)")
+    cur.execute(
+        "CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY, username TEXT UNIQUE, password TEXT)"
+    )
     conn.commit()
     conn.close()
 
 init_db()
+
+# ----------------- HELPERS -----------------
+def bootstrap():
+    """Fetch base FPL data (players, teams, positions, events)."""
+    try:
+        r = requests.get(FPL_BOOTSTRAP, headers=HEADERS, timeout=20)
+        r.raise_for_status()
+        data = r.json()
+        teams = data["teams"]
+        positions = data["element_types"]
+        events = data["events"]
+        return data, teams, positions, events
+    except Exception as e:
+        print(f"⚠️ FPL API fetch failed: {e}")
+        return None, [], [], []
 
 # ----------------- ROUTES -----------------
 @app.route("/")
@@ -104,18 +114,34 @@ def welcome():
         return redirect(url_for("login"))
     return render_template("welcome.html")
 
+@app.route("/my_squad")
+def my_squad():
+    if "username" not in flask_session:
+        return redirect(url_for("login"))
+    data, teams, positions, events = bootstrap()
+    if not data:
+        return render_template("error.html", message="Unable to fetch FPL data")
+    # You can expand this with real squad logic
+    return render_template("my_squad.html", data=data)
+
 @app.route("/squad")
 def squad():
     if "username" not in flask_session:
         return redirect(url_for("login"))
-    try:
-        r = requests.get(FPL_BOOTSTRAP, headers=HEADERS, timeout=20)
-        r.raise_for_status()
-        data = r.json()
-        # Just show the keys of the response for now
-        return {"keys": list(data.keys())}
-    except Exception as e:
-        return {"error": str(e)}
+    data, teams, positions, events = bootstrap()
+    if not data:
+        return render_template("error.html", message="Unable to fetch FPL data")
+    # Example: show teams and positions
+    return render_template("squad.html", teams=teams, positions=positions)
+
+@app.route("/league")
+def league():
+    if "username" not in flask_session:
+        return redirect(url_for("login"))
+    data, teams, positions, events = bootstrap()
+    if not data:
+        return render_template("error.html", message="Unable to fetch FPL data")
+    return render_template("league.html", events=events, teams=teams)
 
 # ----------------- MAIN -----------------
 if __name__ == "__main__":
