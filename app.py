@@ -43,8 +43,9 @@ HEADERS = {
     "User-Agent": "plfpl-mobile/2.0.9 (Android; 11)",
     "Accept": "application/json",
     "accept-language": "en-GB,en;q=0.9",
-    "X-API-Authorization": f"Bearer {ACCESS_TOKEN}" if ACCESS_TOKEN else "",
+    "Authorization": f"Bearer {ACCESS_TOKEN}",
 }
+
 
 # ----------------- DB HANDLING -----------------
 def db():
@@ -61,11 +62,16 @@ init_db()
 
 # ----------------- FPL HELPERS -----------------
 def bootstrap():
-    data = requests.get(FPL_BOOTSTRAP, headers=HEADERS, timeout=20).json()
+    r = requests.get(FPL_BOOTSTRAP, headers=HEADERS, timeout=20)
+    if r.status_code != 200:
+        print("⚠️ FPL API fetch failed:", r.status_code, r.text[:200])
+        return None, {}, {}, []
+    data = r.json()
     teams = {t['id']: t for t in data['teams']}
     positions = {1:'GK',2:'DEF',3:'MID',4:'FWD'}
     events = data['events']
     return data, teams, positions, events
+
 
 def league_points_from_total(total):
     if total == 21: return 10
