@@ -19,7 +19,10 @@ FPL_PLAYER_SUMMARY = 'https://fantasy.premierleague.com/api/element-summary/{}/'
 BADGE_URL_TEMPLATE = 'https://resources.premierleague.com/premierleague/badges/70/t{}.png'
 
 def db():
-    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True) if os.path.dirname(DB_PATH) else None
+    # Only try to create the directory if we have permission
+    dirpath = os.path.dirname(DB_PATH)
+    if dirpath and os.access("/", os.W_OK):
+        os.makedirs(dirpath, exist_ok=True)
     return sqlite3.connect(DB_PATH)
 
 def init_db():
