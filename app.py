@@ -10,13 +10,16 @@ DB_PATH = 'users.db'
 
 HEADERS = {
     "User-Agent": (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/118.0 Safari/537.36"
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:118.0) "
+        "Gecko/20100101 Firefox/118.0"
     ),
-    "Accept": "application/json",
+    "Accept": "application/json, text/plain, */*",
+    "Accept-Language": "en-GB,en;q=0.5",
     "Referer": "https://fantasy.premierleague.com/",
+    "Origin": "https://fantasy.premierleague.com",
+    "Connection": "keep-alive",
 }
+
 
 def safe_get_json(url, timeout=20):
     try:
