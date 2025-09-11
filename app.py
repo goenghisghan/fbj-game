@@ -12,52 +12,48 @@ LOGIN_URL = "https://users.premierleague.com/accounts/login/"
 FPL_BOOTSTRAP = "https://fantasy.premierleague.com/api/bootstrap-static/"
 FPL_FIXTURES = "https://fantasy.premierleague.com/api/fixtures/"
 
-BASE_HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                  "AppleWebKit/537.36 (KHTML, like Gecko) "
-                  "Chrome/118.0.0.0 Safari/537.36",
-    "accept-language": "en-GB,en;q=0.9",
-}
-
 session = requests.session()
 
-def fpl_login():
-    """Login to FPL API using CSRF token like a real browser."""
+# Global headers and token storage
+HEADERS = {
+    "User-Agent": "plfpl-mobile/2.0.9 (Android; 11)",
+    "Accept": "application/json",
+    "accept-language": "en-GB,en;q=0.9"
+}
+ACCESS_TOKEN = None
+
+def fpl_mobile_login():
+    """Login using the mobile API flow to get an access token."""
+    global ACCESS_TOKEN
     email = os.environ.get("FPL_EMAIL", "")
     password = os.environ.get("FPL_PASSWORD", "")
     if not email or not password:
-        print("⚠️ No FPL_EMAIL/FPL_PASSWORD set, skipping login")
+        print("⚠️ No FPL_EMAIL/FPL_PASSWORD set")
         return
 
-    # Step 1: GET login page for CSRF token
-    r1 = session.get(LOGIN_URL, headers=BASE_HEADERS)
-    r1.raise_for_status()
-    csrf_token = session.cookies.get_dict().get("csrftoken", "")
-    print("Fetched CSRF token:", csrf_token)
-
-    # Step 2: POST credentials with CSRF
     payload = {
         "login": email,
         "password": password,
-        "csrfmiddlewaretoken": csrf_token,
-        "app": "plfpl-web",
+        "app": "plfpl-mobile",
         "redirect_uri": "https://fantasy.premierleague.com/"
     }
-    headers = BASE_HEADERS.copy()
-    headers["Referer"] = LOGIN_URL
-    if csrf_token:
-        headers["X-CSRFToken"] = csrf_token
-
-    r2 = session.post(LOGIN_URL, data=payload, headers=headers)
-    r2.raise_for_status()
-
-    print("✅ Login POST done. Cookies now:", session.cookies.get_dict())
-    print("Login response snippet:", r2.text[:300])
+    try:
+        r = session.post(LOGIN_URL, data=payload, headers=HEADERS)
+        r.raise_for_status()
+        data = r.json()
+        ACCESS_TOKEN = data.get("access_token")
+        if ACCESS_TOKEN:
+            HEADERS["X-API-Authorization"] = f"Bearer {ACCESS_TOKEN}"
+            print("✅ Logged in via mobile API, access token acquired")
+        else:
+            print("⚠️ No access token in login response:", data)
+    except Exception as e:
+        print("⚠️ Mobile login failed:", e)
 
 def safe_get_json(url, timeout=20):
-    """Fetch JSON from FPL API with current session."""
+    """Fetch JSON from FPL API with access token headers."""
     try:
-        r = session.get(url, headers=BASE_HEADERS, timeout=timeout)
+        r = session.get(url, headers=HEADERS, timeout=timeout)
         r.raise_for_status()
         return r.json()
     except Exception as e:
@@ -68,11 +64,11 @@ def safe_get_json(url, timeout=20):
             pass
         return {}
 
-# Try login on startup
+# Login once on startup
 try:
-    fpl_login()
+    fpl_mobile_login()
 except Exception as e:
-    print("⚠️ Login failed:", e)
+    print("⚠️ Startup login failed:", e)
 
 # --- Database setup ---
 def db():
