@@ -63,6 +63,25 @@ init_db()
 def root():
     return redirect(url_for("login"))
 
+@app.route("/register", methods=["GET", "POST"])
+def register():
+    if request.method == "POST":
+        u = request.form["username"]
+        p = request.form["password"]
+        conn = db()
+        cur = conn.cursor()
+        try:
+            cur.execute("INSERT INTO users(username, password) VALUES(?, ?)", 
+                        (u, generate_password_hash(p)))
+            conn.commit()
+            flash("✅ Registration successful, please log in")
+            return redirect(url_for("login"))
+        except sqlite3.IntegrityError:
+            flash("⚠️ Username already taken")
+        finally:
+            conn.close()
+    return render_template("register.html")
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
