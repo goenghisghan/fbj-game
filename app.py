@@ -12,48 +12,52 @@ LOGIN_URL = "https://users.premierleague.com/accounts/login/"
 FPL_BOOTSTRAP = "https://fantasy.premierleague.com/api/bootstrap-static/"
 FPL_FIXTURES = "https://fantasy.premierleague.com/api/fixtures/"
 
-HEADERS = {
-    "User-Agent": "Dalvik/2.1.0 (Linux; U; Android 5.1; PRO 5 Build/LMY47D)",
-    "accept-language": "en",
-    "Content-Type": "application/x-www-form-urlencoded",
-    "Accept": "application/json"
+BASE_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                  "AppleWebKit/537.36 (KHTML, like Gecko) "
+                  "Chrome/118.0.0.0 Safari/537.36",
+    "accept-language": "en-GB,en;q=0.9",
 }
 
 session = requests.session()
 
 def fpl_login():
-    """Login to FPL API and store Bearer access token for all requests."""
+    """Login to FPL API using CSRF token like a real browser."""
     email = os.environ.get("FPL_EMAIL", "")
     password = os.environ.get("FPL_PASSWORD", "")
     if not email or not password:
         print("⚠️ No FPL_EMAIL/FPL_PASSWORD set, skipping login")
         return
 
+    # Step 1: GET login page for CSRF token
+    r1 = session.get(LOGIN_URL, headers=BASE_HEADERS)
+    r1.raise_for_status()
+    csrf_token = session.cookies.get_dict().get("csrftoken", "")
+    print("Fetched CSRF token:", csrf_token)
+
+    # Step 2: POST credentials with CSRF
     payload = {
         "login": email,
         "password": password,
+        "csrfmiddlewaretoken": csrf_token,
         "app": "plfpl-web",
-        "redirect_uri": "https://fantasy.premierleague.com/a/login"
+        "redirect_uri": "https://fantasy.premierleague.com/"
     }
-    r = session.post(LOGIN_URL, data=payload, headers=HEADERS)
-    r.raise_for_status()
+    headers = BASE_HEADERS.copy()
+    headers["Referer"] = LOGIN_URL
+    if csrf_token:
+        headers["X-CSRFToken"] = csrf_token
 
-    try:
-        resp_json = r.json()
-        token = resp_json.get("access_token")
-        if not token:
-            print("⚠️ No access token in login response:", resp_json)
-            return
-        HEADERS["X-API-Authorization"] = f"Bearer {token}"
-        print("✅ Logged in, access token acquired")
-    except Exception as e:
-        print("⚠️ Failed to parse login response:", e)
-        print("Login raw response snippet:\n", r.text[:500])
+    r2 = session.post(LOGIN_URL, data=payload, headers=headers)
+    r2.raise_for_status()
+
+    print("✅ Login POST done. Cookies now:", session.cookies.get_dict())
+    print("Login response snippet:", r2.text[:300])
 
 def safe_get_json(url, timeout=20):
-    """Fetch JSON from FPL API with Bearer token headers."""
+    """Fetch JSON from FPL API with current session."""
     try:
-        r = session.get(url, headers=HEADERS, timeout=timeout)
+        r = session.get(url, headers=BASE_HEADERS, timeout=timeout)
         r.raise_for_status()
         return r.json()
     except Exception as e:
