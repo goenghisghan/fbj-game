@@ -38,8 +38,8 @@ def generate_code_challenge(verifier):
 def fpl_login():
     """Perform OAuth2 PKCE login flow and set ACCESS_TOKEN"""
     global ACCESS_TOKEN
-    email = os.environ.get("EMAIL")
-    password = os.environ.get("PASSWORD")
+    email = os.environ.get("FPL_EMAIL")
+    password = os.environ.get("FPL_PASSWORD")
     if not email or not password:
         print("⚠️ EMAIL/PASSWORD not set in environment")
         return
