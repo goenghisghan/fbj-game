@@ -1,5 +1,4 @@
 import os, sqlite3, requests
-from datetime import datetime, timezone
 from flask import Flask, render_template, request, redirect, url_for, session as flask_session, flash
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -13,45 +12,37 @@ LOGIN_URL = "https://users.premierleague.com/accounts/login/"
 FPL_BOOTSTRAP = "https://fantasy.premierleague.com/api/bootstrap-static/"
 FPL_FIXTURES = "https://fantasy.premierleague.com/api/fixtures/"
 
+# Pretend to be the Android app (this is the trick!)
 HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:118.0) "
-        "Gecko/20100101 Firefox/118.0"
-    ),
-    "Accept": "application/json, text/plain, */*",
-    "Accept-Language": "en-GB,en;q=0.5",
-    "Referer": "https://fantasy.premierleague.com/",
-    "Origin": "https://fantasy.premierleague.com",
-    "Connection": "keep-alive",
+    "User-Agent": "Dalvik/2.1.0 (Linux; U; Android 5.1; PRO 5 Build/LMY47D)",
+    "accept-language": "en"
 }
 
-session = requests.Session()
+session = requests.session()
 
 def fpl_login():
-    """Login to FPL API using credentials from environment variables."""
+    """Login to FPL API using mobile app style headers."""
     email = os.environ.get("FPL_EMAIL", "")
     password = os.environ.get("FPL_PASSWORD", "")
     if not email or not password:
         print("⚠️ No FPL_EMAIL/FPL_PASSWORD set, skipping login")
         return
+
     payload = {
         "login": email,
         "password": password,
-        "redirect_uri": "https://fantasy.premierleague.com/",
         "app": "plfpl-web",
+        "redirect_uri": "https://fantasy.premierleague.com/a/login"
     }
     r = session.post(LOGIN_URL, data=payload, headers=HEADERS)
     r.raise_for_status()
-    print("✅ Logged in to FPL API")
+    print("✅ Logged in with Android-style headers")
     print("Session cookies:", session.cookies.get_dict())
 
 def safe_get_json(url, timeout=20):
-    """Fetch JSON from FPL API with session + headers, fallback retry without headers if 403."""
+    """Fetch JSON from FPL API with Android-style headers + logged-in session."""
     try:
         r = session.get(url, headers=HEADERS, timeout=timeout)
-        if r.status_code == 403:
-            print(f"⚠️ 403 for {url} with headers, retrying without headers")
-            r = session.get(url, timeout=timeout)
         r.raise_for_status()
         return r.json()
     except Exception as e:
