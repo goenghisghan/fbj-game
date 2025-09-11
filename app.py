@@ -1,314 +1,105 @@
 import os, sqlite3, requests
 from datetime import datetime, timezone
-from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
+from flask import Flask, render_template, request, redirect, url_for, session, flash
 from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
-app.secret_key = os.environ.get('SECRET_KEY', 'devsecret')
+app.secret_key = os.environ.get('SECRET_KEY','dev')
 
-app.config.update(
-    SESSION_COOKIE_SAMESITE='Lax',
-    SESSION_COOKIE_SECURE=True,
-)
+DB_PATH = 'users.db'
 
-DB_PATH = os.environ.get('DB_PATH', 'users.db')
+HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/118.0 Safari/537.36"
+    ),
+    "Accept": "application/json",
+    "Referer": "https://fantasy.premierleague.com/",
+}
 
-FPL_BOOTSTRAP = 'https://fantasy.premierleague.com/api/bootstrap-static/'
-FPL_FIXTURES = 'https://fantasy.premierleague.com/api/fixtures/'
-FPL_PLAYER_SUMMARY = 'https://fantasy.premierleague.com/api/element-summary/{}/'
-BADGE_URL_TEMPLATE = 'https://resources.premierleague.com/premierleague/badges/70/t{}.png'
+def safe_get_json(url, timeout=20):
+    try:
+        r = requests.get(url, headers=HEADERS, timeout=timeout)
+        r.raise_for_status()
+        return r.json()
+    except Exception as e:
+        print(f"FPL API fetch failed for {url}: {e}")
+        try: flash("⚠️ Unable to fetch FPL data","warning")
+        except: pass
+        return {}
+
+FPL_BOOTSTRAP='https://fantasy.premierleague.com/api/bootstrap-static/'
+FPL_FIXTURES='https://fantasy.premierleague.com/api/fixtures/'
 
 def db():
-    # Only try to create the directory if we have permission
-    dirpath = os.path.dirname(DB_PATH)
-    if dirpath and os.access("/", os.W_OK):
-        os.makedirs(dirpath, exist_ok=True)
     return sqlite3.connect(DB_PATH)
 
 def init_db():
-    conn = db(); cur = conn.cursor()
-    cur.execute('CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE NOT NULL, password TEXT NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);')
-    cur.execute('CREATE TABLE IF NOT EXISTS picks (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, gameweek_id INTEGER NOT NULL, position TEXT NOT NULL, player_id INTEGER NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, UNIQUE(user_id, gameweek_id, position));')
-    cur.execute('CREATE TABLE IF NOT EXISTS results (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, gameweek_id INTEGER NOT NULL, gw_points INTEGER NOT NULL, league_points INTEGER NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, UNIQUE(user_id, gameweek_id));')
+    conn=db(); cur=conn.cursor()
+    cur.execute('CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY, username TEXT UNIQUE, password TEXT)')
     conn.commit(); conn.close()
 init_db()
-
-def bootstrap():
-    data = requests.get(FPL_BOOTSTRAP, timeout=20).json()
-    teams = {t['id']: t for t in data['teams']}
-    positions = {1:'GK',2:'DEF',3:'MID',4:'FWD'}
-    events = data['events']
-    return data, teams, positions, events
-
-def league_points_from_total(total):
-    if total == 21: return 10
-    if total == 20: return 4
-    if total == 19: return 3
-    if total == 18: return 2
-    if total == 17: return 1
-    return 0
-
-def next_opponents_by_team(teams):
-    fixtures = requests.get(FPL_FIXTURES, timeout=20).json()
-    choice = {}
-    for f in fixtures:
-        if f.get('finished') or f.get('finished_provisional'):
-            continue
-        h,a = f['team_h'], f['team_a']
-        if h not in choice: choice[h] = teams[a]['short_name']+' (H)'
-        if a not in choice: choice[a] = teams[h]['short_name']+' (A)'
-    return choice
-
-def decorate_players(players,teams,positions,opp_map):
-    out=[]
-    for p in players:
-        d=dict(p); d['team_name']=teams[p['team']]['name']; d['position_name']=positions[p['element_type']]; d['next_opp']=opp_map.get(p['team'],'-')
-        out.append(d)
-    return out
 
 def get_user_id(username):
     conn=db(); cur=conn.cursor(); cur.execute('SELECT id FROM users WHERE username=?',(username,)); r=cur.fetchone(); conn.close()
     return r[0] if r else None
 
-def get_locked_picks(user_id, events):
-    now = datetime.now(timezone.utc)
-    nxt = next((e for e in events if e.get('is_next')), None)
-    if nxt:
-        fromiso = datetime.fromisoformat(nxt['deadline_time'].replace('Z','+00:00'))
-        if now < fromiso:
-            return {}, None
-    cur_ev = next((e for e in events if e.get('is_current')), None)
-    if not cur_ev: return {}, None
-    gw_id = cur_ev['id']
-    conn=db(); cur=conn.cursor(); cur.execute('SELECT position, player_id FROM picks WHERE user_id=? AND gameweek_id=?',(user_id,gw_id)); rows=cur.fetchall(); conn.close()
-    return ({pos:pid for pos,pid in rows}, gw_id)
-
-def get_pending_picks(user_id, events):
-    nxt = next((e for e in events if e.get('is_next')), None)
-    if not nxt: nxt = next((e for e in events if not e.get('finished')), None)
-    if not nxt: return {}, None
-    gw_id = nxt['id']
-    conn=db(); cur=conn.cursor(); cur.execute('SELECT position, player_id FROM picks WHERE user_id=? AND gameweek_id=?',(user_id,gw_id)); rows=cur.fetchall(); conn.close()
-    return ({pos:pid for pos,pid in rows}, gw_id)
-
-def gw_stats_for_player(player_id, gw_round):
-    try:
-        summ=requests.get(FPL_PLAYER_SUMMARY.format(player_id),timeout=20).json()
-        for h in summ.get('history',[]):
-            if h.get('round')==gw_round: return h
-    except: pass
-    return {}
-
 @app.route('/')
 def root(): return redirect(url_for('login'))
 
-@app.route('/register', methods=['GET','POST'])
+@app.route('/register',methods=['GET','POST'])
 def register():
     if request.method=='POST':
-        u=request.form['username'].strip(); p=request.form['password']
+        u=request.form['username']; p=request.form['password']
         try:
-            conn=db(); cur=conn.cursor(); cur.execute('INSERT INTO users (username,password) VALUES (?,?)',(u,generate_password_hash(p))); conn.commit(); conn.close()
-            flash('Registration successful! Please login.','success'); return redirect(url_for('login'))
-        except sqlite3.IntegrityError:
-            flash('Username already exists.','danger')
-    return render_template('register.html',title='Register')
+            conn=db(); cur=conn.cursor(); cur.execute('INSERT INTO users(username,password) VALUES (?,?)',(u,generate_password_hash(p))); conn.commit(); conn.close()
+            flash('Registered, please login.'); return redirect(url_for('login'))
+        except: flash('User exists')
+    return render_template('register.html')
 
-@app.route('/login', methods=['GET','POST'])
+@app.route('/login',methods=['GET','POST'])
 def login():
     if request.method=='POST':
-        u=request.form['username'].strip(); p=request.form['password']
+        u=request.form['username']; p=request.form['password']
         conn=db(); cur=conn.cursor(); cur.execute('SELECT * FROM users WHERE username=?',(u,)); user=cur.fetchone(); conn.close()
         if user and check_password_hash(user[2],p):
             session['username']=u; return redirect(url_for('welcome'))
-        flash('Invalid username or password.','danger')
-    return render_template('login.html',title='Login')
+        flash('Invalid credentials')
+    return render_template('login.html')
 
 @app.route('/logout')
-def logout(): session.clear(); flash('Logged out.','info'); return redirect(url_for('login'))
+def logout(): session.clear(); return redirect(url_for('login'))
 
 @app.route('/welcome')
 def welcome():
     if 'username' not in session: return redirect(url_for('login'))
-    return render_template('welcome.html',title='Welcome')
-
-@app.route('/my_squad')
-def my_squad():
-    if 'username' not in session: return redirect(url_for('login'))
-    username=session['username']; uid=get_user_id(username)
-    data,teams,positions,events=bootstrap()
-    locked, gw_id = get_locked_picks(uid, events)
-    total_points=0; squad={'GK':None,'DEF':None,'MID':None,'FWD':None}
-    if locked and gw_id:
-        team_map={t['id']:t for t in data['teams']}; player_map={p['id']:p for p in data['elements']}
-        for pos in squad.keys():
-            pid = locked.get(pos)
-            if not pid: continue
-            p = player_map.get(pid)
-            if not p: continue
-            photo_id=p.get('photo','').split('.')[0]
-            photo_url=f'https://resources.premierleague.com/premierleague/photos/players/110x140/p{photo_id}.png'
-            hist=gw_stats_for_player(pid, gw_id)
-            gw_pts=hist.get('total_points',0) if hist else 0
-            total_points+=gw_pts
-            def_contrib=hist.get('defensive_contributions', hist.get('bps',0)) if hist else 0
-            squad[pos]={
-                'name':f"{p.get('first_name','')} {p.get('second_name','')}".strip(),
-                'team_name':team_map[p['team']]['name'],
-                'photo_url':photo_url,
-                'gw_points':gw_pts,
-                'stats': ({
-                    'position':positions[p['element_type']],
-                    'minutes':hist.get('minutes',0),
-                    'saves':hist.get('saves',0),
-                    'goals_conceded':hist.get('goals_conceded',0),
-                    'assists':hist.get('assists',0),
-                    'goals_scored':hist.get('goals_scored',0),
-                    'bonus':hist.get('bonus',0),
-                    'def_contrib':def_contrib,
-                    'yellow_cards':hist.get('yellow_cards',0),
-                    'red_cards':hist.get('red_cards',0),
-                    'penalties_missed':hist.get('penalties_missed',0),
-                    'own_goals':hist.get('own_goals',0),
-                } if hist else None)
-            }
-    return render_template('my_squad.html',title='GW Lineup',username=username,total_points=total_points,squad=squad)
+    return render_template('welcome.html')
 
 @app.route('/squad')
 def squad():
     if 'username' not in session: return redirect(url_for('login'))
-    username=session['username']; uid=get_user_id(username)
-    club=request.args.get('club'); position=request.args.get('position'); page=int(request.args.get('page',1))
-    data,teams,positions,events=bootstrap(); team_map={t['id']:t for t in data['teams']}
-    opp_map=next_opponents_by_team(team_map)
-    players=decorate_players(data['elements'],team_map,positions,opp_map)
-    players.sort(key=lambda x:x.get('total_points',0), reverse=True)
-    if club: players=[p for p in players if p['team_name']==club]
-    if position: players=[p for p in players if p['position_name']==position]
-    page_size=20; start=(page-1)*page_size; end=start+page_size
-    subset=players[start:end]; total_pages=(len(players)+page_size-1)//page_size
+    data = safe_get_json(FPL_BOOTSTRAP)
+    teams={t['id']:t for t in data.get('teams',[])}; positions={1:'GK',2:'DEF',3:'MID',4:'FWD'}
+    players=[]
+    for p in data.get('elements',[]):
+        players.append({
+            'first_name':p['first_name'],'second_name':p['second_name'],
+            'team_name':teams.get(p['team'],{}).get('name',''),
+            'position_name':positions.get(p['element_type'],''),
+            'total_points':p['total_points'],'next_opp':'-'
+        })
+    return render_template('squad.html',players=players)
 
-    pending, gw_next = get_pending_picks(uid, events)
-    selected={'GK':None,'DEF':None,'MID':None,'FWD':None}
-    player_map={p['id']:p for p in data['elements']}
-    for pos,pid in pending.items():
-        p=player_map.get(pid)
-        if not p: continue
-        team=team_map[p['team']]
-        badge_url=BADGE_URL_TEMPLATE.format(team['code'])
-        selected[pos]={'first_name':p['first_name'],'second_name':p['second_name'],'team_name':team['name'],'kit_url':badge_url}
-    selected_clubs=set([selected[pos]['team_name'] for pos in selected if selected[pos]])
+@app.route('/my_squad')
+def my_squad():
+    if 'username' not in session: return redirect(url_for('login'))
+    username=session['username']
+    squad={'GK':None,'DEF':None,'MID':None,'FWD':None}
+    return render_template('my_squad.html',username=username,squad=squad)
 
-    class O(dict): __getattr__=dict.get
-    subset=[O(p) for p in subset]
-    clubs=sorted({team_map[p['team']]['name'] for p in data['elements']})
-    return render_template('squad.html',title='Pick Team',players=subset,selected=selected,selected_clubs=selected_clubs,clubs=clubs,current_page=page,total_pages=total_pages)
-
-@app.route('/pick_player', methods=['POST'])
-def pick_player():
-    if 'username' not in session: return ('',401)
-    data_json = request.get_json(force=True)
-    position=data_json['position']; player_id=int(data_json['player_id'])
-    username=session['username']; uid=get_user_id(username)
-    data,teams,positions,events=bootstrap()
-    player=next((p for p in data['elements'] if p['id']==player_id),None)
-    if not player: return jsonify({'status':'error'}),400
-    pos_name=positions[player['element_type']]
-    if pos_name!=position: return jsonify({'status':'error'}),400
-    pending, gw_next = get_pending_picks(uid, events)
-    team_map={t['id']:t for t in data['teams']}
-    chosen_clubs=set()
-    for pos,pid in pending.items():
-        pp=next((e for e in data['elements'] if e['id']==pid),None)
-        if pp: chosen_clubs.add(team_map[pp['team']]['name'])
-    if team_map[player['team']]['name'] in chosen_clubs:
-        return jsonify({'status':'error','msg':'Club already selected'}),400
-    conn=db(); cur=conn.cursor()
-    cur.execute('INSERT INTO picks (user_id, gameweek_id, position, player_id) VALUES (?,?,?,?) ON CONFLICT(user_id, gameweek_id, position) DO UPDATE SET player_id=excluded.player_id',(uid,gw_next,position,player_id))
-    conn.commit(); conn.close()
-    return jsonify({'status':'ok'})
-
-@app.route('/remove_player', methods=['POST'])
-def remove_player():
-    if 'username' not in session: return ('',401)
-    position=request.get_json(force=True)['position']
-    username=session['username']; uid=get_user_id(username)
-    data,teams,positions,events=bootstrap()
-    pending, gw_next = get_pending_picks(uid, events)
-    conn=db(); cur=conn.cursor(); cur.execute('DELETE FROM picks WHERE user_id=? AND gameweek_id=? AND position=?',(uid,gw_next,position)); conn.commit(); conn.close()
-    return jsonify({'status':'ok'})
-
-@app.route('/clear_team', methods=['POST'])
-def clear_team():
-    if 'username' not in session: return ('',401)
-    username=session['username']; uid=get_user_id(username)
-    data,teams,positions,events=bootstrap()
-    pending, gw_next = get_pending_picks(uid, events)
-    conn=db(); cur=conn.cursor(); cur.execute('DELETE FROM picks WHERE user_id=? AND gameweek_id=?',(uid,gw_next)); conn.commit(); conn.close()
-    return jsonify({'status':'ok'})
-
-def all_users():
-    conn=db(); cur=conn.cursor(); cur.execute('SELECT id, username FROM users ORDER BY username ASC'); rows=cur.fetchall(); conn.close()
-    return [{'id':r[0],'username':r[1]} for r in rows]
-
-def gw_stats_for_user(uid, gw_id):
-    conn=db(); cur=conn.cursor(); cur.execute('SELECT position, player_id FROM picks WHERE user_id=? AND gameweek_id=?',(uid,gw_id)); rows=cur.fetchall(); conn.close()
-    if not rows: return 0
-    total=0
-    for _, pid in rows:
-        hist=gw_stats_for_player(pid, gw_id)
-        total += hist.get('total_points',0) if hist else 0
-    return total
-
-@app.route('/league', methods=['GET'])
+@app.route('/league')
 def league():
     if 'username' not in session: return redirect(url_for('login'))
-    data,teams,positions,events=bootstrap()
-    users=all_users()
-    conn=db(); cur=conn.cursor()
-    cur.execute('SELECT u.username, COALESCE(SUM(r.league_points),0) as total_lp, CASE WHEN COUNT(r.gw_points)>0 THEN AVG(CASE WHEN r.gw_points BETWEEN 0 AND 21 THEN r.gw_points ELSE 0 END) ELSE 0 END as avg_gw FROM users u LEFT JOIN results r ON r.user_id=u.id GROUP BY u.id ORDER BY total_lp DESC, avg_gw DESC, u.username ASC')
-    league_rows=[{'username':r[0],'total_lp':int(r[1]),'avg_gw':float(r[2])} for r in cur.fetchall()]
-
-    sel_gw=request.args.get('gw',type=int)
-    cur_ev = next((e for e in events if e.get('is_current')), None)
-    nxt_ev = next((e for e in events if e.get('is_next')), None)
-    default_gw = cur_ev['id'] if cur_ev else (nxt_ev['id'] if nxt_ev else 1)
-    selected_gw = sel_gw or default_gw
-
-    cur.execute('SELECT user_id, gw_points, league_points FROM results WHERE gameweek_id=?',(selected_gw,))
-    resmap={row[0]:{'gw_points':row[1],'league_points':row[2]} for row in cur.fetchall()}
-    history_rows=[]
-    for u in users:
-        if u['id'] in resmap:
-            gwp=resmap[u['id']]['gw_points']; lp=resmap[u['id']]['league_points']
-        else:
-            gwp=gw_stats_for_user(u['id'], selected_gw); lp=league_points_from_total(gwp)
-        display_points = f"{gwp}" if gwp<=21 else f"Bust ({gwp})"
-        history_rows.append({'username':u['username'],'gw_points':gwp,'display_points':display_points,'league_points':lp})
-    history_rows.sort(key=lambda r:(r['league_points'], r['gw_points']), reverse=True)
-
-    fixtures=requests.get(FPL_FIXTURES,timeout=20).json()
-    relevant=[f for f in fixtures if f.get('event')==selected_gw]
-    can_finalize=bool(relevant) and all(f.get('finished') for f in relevant)
-
-    all_gws=[{'id':e['id']} for e in events]
-    return render_template('league.html',title='League & History',league_rows=league_rows,history_rows=history_rows,all_gws=all_gws,selected_gw=selected_gw,can_finalize=can_finalize)
-
-@app.route('/finalize_gw', methods=['POST'])
-def finalize_gw():
-    if 'username' not in session: return redirect(url_for('login'))
-    data,teams,positions,events=bootstrap()
-    sel_gw=request.args.get('gw',type=int) or request.form.get('gw',type=int)
-    cur_ev=next((e for e in events if e.get('is_current')), None)
-    nxt_ev=next((e for e in events if e.get('is_next')), None)
-    selected_gw = sel_gw or (cur_ev['id'] if cur_ev else (nxt_ev['id'] if nxt_ev else 1))
-    users=all_users()
-    conn=db(); cur=conn.cursor()
-    for u in users:
-        gwp=gw_stats_for_user(u['id'], selected_gw); lp=league_points_from_total(gwp)
-        cur.execute('INSERT OR REPLACE INTO results (user_id, gameweek_id, gw_points, league_points) VALUES (?,?,?,?)',(u['id'],selected_gw,gwp,lp))
-    conn.commit(); conn.close()
-    flash(f'Finalized GW {selected_gw} results.','success')
-    return redirect(url_for('league', gw=selected_gw))
-
-if __name__ == '__main__':
-    app.run(debug=True)
+    league_rows=[{'username':'demo','total_lp':0,'avg_gw':0.0}]
+    return render_template('league.html',league_rows=league_rows)
