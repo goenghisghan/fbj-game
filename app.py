@@ -13,39 +13,20 @@ app.config.update(
 
 DB_PATH = os.environ.get('DB_PATH', 'users.db')
 
-FPL_BOOTSTRAP = 'https://fantasy.premierleague.com/api/bootstrap-static/'
-FPL_FIXTURES = 'https://fantasy.premierleague.com/api/fixtures/'
-FPL_PLAYER_SUMMARY = 'https://fantasy.premierleague.com/api/element-summary/{}/'
-BADGE_URL_TEMPLATE = 'https://resources.premierleague.com/premierleague/badges/70/t{}.png'
-
-# ----------------- TOKEN HANDLING -----------------
-def get_tokens_from_gist():
+# ----------------- GIST HANDLING -----------------
+def load_fpl_from_gist():
     gist_id = os.getenv("GIST_ID")
     github_token = os.getenv("GITHUB_TOKEN")
     if not gist_id or not github_token:
-        print("⚠️ Missing GIST_ID or GITHUB_TOKEN in environment")
-        return None, None
+        raise RuntimeError("⚠️ Missing GIST_ID or GITHUB_TOKEN in environment")
 
     url = f"https://api.github.com/gists/{gist_id}"
     headers = {"Authorization": f"Bearer {github_token}"}
-    r = requests.get(url, headers=headers)
+    r = requests.get(url, headers=headers, timeout=30)
     r.raise_for_status()
     gist_data = r.json()
-
-    file_content = list(gist_data["files"].values())[0]["content"]
-    tokens = json.loads(file_content)
-
-    return tokens.get("access_token"), tokens.get("refresh_token")
-
-ACCESS_TOKEN, REFRESH_TOKEN = get_tokens_from_gist()
-
-HEADERS = {
-    "User-Agent": "plfpl-mobile/2.0.9 (Android; 11)",
-    "Accept": "application/json",
-    "accept-language": "en-GB,en;q=0.9",
-    "Authorization": f"Bearer {ACCESS_TOKEN}",
-}
-
+    file_content = gist_data["files"]["fpl_stats.json"]["content"]
+    return json.loads(file_content)
 
 # ----------------- DB HANDLING -----------------
 def db():
@@ -62,16 +43,12 @@ init_db()
 
 # ----------------- FPL HELPERS -----------------
 def bootstrap():
-    r = requests.get(FPL_BOOTSTRAP, headers=HEADERS, timeout=20)
-    if r.status_code != 200:
-        print("⚠️ FPL API fetch failed:", r.status_code, r.text[:200])
-        return None, {}, {}, []
-    data = r.json()
-    teams = {t['id']: t for t in data['teams']}
+    data = load_fpl_from_gist()
+    bootstrap_data = data.get("bootstrap", {})
+    teams = {t['id']: t for t in bootstrap_data.get('teams', [])}
     positions = {1:'GK',2:'DEF',3:'MID',4:'FWD'}
-    events = data['events']
-    return data, teams, positions, events
-
+    events = bootstrap_data.get('events', [])
+    return bootstrap_data, teams, positions, events
 
 def league_points_from_total(total):
     if total == 21: return 10
@@ -82,7 +59,8 @@ def league_points_from_total(total):
     return 0
 
 def next_opponents_by_team(teams):
-    fixtures = requests.get(FPL_FIXTURES, headers=HEADERS, timeout=20).json()
+    data = load_fpl_from_gist()
+    fixtures = data.get("fixtures", [])
     choice = {}
     for f in fixtures:
         if f.get('finished') or f.get('finished_provisional'):
@@ -95,7 +73,10 @@ def next_opponents_by_team(teams):
 def decorate_players(players,teams,positions,opp_map):
     out=[]
     for p in players:
-        d=dict(p); d['team_name']=teams[p['team']]['name']; d['position_name']=positions[p['element_type']]; d['next_opp']=opp_map.get(p['team'],'-')
+        d=dict(p)
+        d['team_name']=teams[p['team']]['name']
+        d['position_name']=positions[p['element_type']]
+        d['next_opp']=opp_map.get(p['team'],'-')
         out.append(d)
     return out
 
@@ -125,12 +106,8 @@ def get_pending_picks(user_id, events):
     return ({pos:pid for pos,pid in rows}, gw_id)
 
 def gw_stats_for_player(player_id, gw_round):
-    try:
-        summ=requests.get(FPL_PLAYER_SUMMARY.format(player_id), headers=HEADERS, timeout=20).json()
-        for h in summ.get('history',[]):
-            if h.get('round')==gw_round: return h
-    except: pass
-    return {}
+    data = load_fpl_from_gist()
+    return data.get("stats", {}).get(str(gw_round), {}).get(str(player_id), {})
 
 # ----------------- ROUTES -----------------
 @app.route('/')
@@ -141,7 +118,9 @@ def register():
     if request.method=='POST':
         u=request.form['username'].strip(); p=request.form['password']
         try:
-            conn=db(); cur=conn.cursor(); cur.execute('INSERT INTO users (username,password) VALUES (?,?)',(u,generate_password_hash(p))); conn.commit(); conn.close()
+            conn=db(); cur=conn.cursor()
+            cur.execute('INSERT INTO users (username,password) VALUES (?,?)',(u,generate_password_hash(p)))
+            conn.commit(); conn.close()
             flash('Registration successful! Please login.','success'); return redirect(url_for('login'))
         except sqlite3.IntegrityError:
             flash('Username already exists.','danger')
@@ -151,7 +130,8 @@ def register():
 def login():
     if request.method=='POST':
         u=request.form['username'].strip(); p=request.form['password']
-        conn=db(); cur=conn.cursor(); cur.execute('SELECT * FROM users WHERE username=?',(u,)); user=cur.fetchone(); conn.close()
+        conn=db(); cur=conn.cursor(); cur.execute('SELECT * FROM users WHERE username=?',(u,))
+        user=cur.fetchone(); conn.close()
         if user and check_password_hash(user[2],p):
             session['username']=u; return redirect(url_for('welcome'))
         flash('Invalid username or password.','danger')
@@ -173,7 +153,8 @@ def my_squad():
     locked, gw_id = get_locked_picks(uid, events)
     total_points=0; squad={'GK':None,'DEF':None,'MID':None,'FWD':None}
     if locked and gw_id:
-        team_map={t['id']:t for t in data['teams']}; player_map={p['id']:p for p in data['elements']}
+        team_map={t['id']:t for t in data['teams']}
+        player_map={p['id']:p for p in data['elements']}
         for pos in squad.keys():
             pid = locked.get(pos)
             if not pid: continue
@@ -212,7 +193,8 @@ def squad():
     if 'username' not in session: return redirect(url_for('login'))
     username=session['username']; uid=get_user_id(username)
     club=request.args.get('club'); position=request.args.get('position'); page=int(request.args.get('page',1))
-    data,teams,positions,events=bootstrap(); team_map={t['id']:t for t in data['teams']}
+    data,teams,positions,events=bootstrap()
+    team_map={t['id']:t for t in data['teams']}
     opp_map=next_opponents_by_team(team_map)
     players=decorate_players(data['elements'],team_map,positions,opp_map)
     players.sort(key=lambda x:x.get('total_points',0), reverse=True)
@@ -224,11 +206,12 @@ def squad():
     pending, gw_next = get_pending_picks(uid, events)
     selected={'GK':None,'DEF':None,'MID':None,'FWD':None}
     player_map={p['id']:p for p in data['elements']}
+    badge_template = load_fpl_from_gist().get("badge_template")
     for pos,pid in pending.items():
         p=player_map.get(pid)
         if not p: continue
         team=team_map[p['team']]
-        badge_url=BADGE_URL_TEMPLATE.format(team['code'])
+        badge_url=badge_template.format(team['code'])
         selected[pos]={'first_name':p['first_name'],'second_name':p['second_name'],'team_name':team['name'],'kit_url':badge_url}
     selected_clubs=set([selected[pos]['team_name'] for pos in selected if selected[pos]])
 
@@ -320,7 +303,7 @@ def league():
         history_rows.append({'username':u['username'],'gw_points':gwp,'display_points':display_points,'league_points':lp})
     history_rows.sort(key=lambda r:(r['league_points'], r['gw_points']), reverse=True)
 
-    fixtures=requests.get(FPL_FIXTURES, headers=HEADERS, timeout=20).json()
+    fixtures = load_fpl_from_gist().get("fixtures", [])
     relevant=[f for f in fixtures if f.get('event')==selected_gw]
     can_finalize=bool(relevant) and all(f.get('finished') for f in relevant)
 
