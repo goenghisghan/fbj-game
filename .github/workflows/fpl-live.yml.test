@@ -1,0 +1,70 @@
+name: FPL Live Update
+
+on:
+  schedule:
+    - cron: "*/45 * * * *"
+  workflow_dispatch:
+
+jobs:
+  update-live:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.x"
+      - run: pip install requests
+      - name: Update bootstrap + live GW stats
+        env:
+          GIST_ID: ${{ secrets.GIST_ID }}
+          GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
+        run: |
+          python - <<'EOF'
+          import os, requests, json, sys
+          GIST_ID, GIST_TOKEN = os.environ["GIST_ID"], os.environ["GIST_TOKEN"]
+
+          headers = {"User-Agent": "Mozilla/5.0"}
+          gist_url = f"https://api.github.com/gists/{GIST_ID}"
+          gh_headers = {"Authorization": f"Bearer {GIST_TOKEN}"}
+
+          # Load existing data
+          r = requests.get(gist_url, headers=gh_headers)
+          r.raise_for_status()
+          stats = json.loads(r.json()["files"]["fpl_stats.json"]["content"])
+
+          # Fetch bootstrap
+          r = requests.get("https://fantasy.premierleague.com/api/bootstrap-static/", headers=headers, timeout=30)
+          if r.status_code != 200:
+              print("⚠️ Bootstrap fetch failed, skipping update")
+              sys.exit(0)
+          try:
+              bootstrap = r.json()
+          except Exception:
+              print("⚠️ Invalid JSON for bootstrap, skipping update")
+              sys.exit(0)
+          stats["bootstrap"] = bootstrap
+
+          # Current GW
+          current_event = next((e for e in bootstrap["events"] if e.get("is_current")), None)
+          if not current_event:
+              print("⚠️ No current GW found, skipping update")
+              sys.exit(0)
+          gw_id = current_event["id"]
+
+          # Fetch live GW stats
+          r = requests.get(f"https://fantasy.premierleague.com/api/event/{gw_id}/live/", headers=headers, timeout=30)
+          if r.status_code != 200:
+              print(f"⚠️ Live GW fetch failed ({r.status_code}), skipping update")
+              sys.exit(0)
+          try:
+              live = r.json()
+          except Exception:
+              print("⚠️ Invalid JSON for live GW, skipping update")
+              sys.exit(0)
+
+          stats["stats"][str(gw_id)] = {str(pid): p["stats"] for pid, p in live["elements"].items()}
+
+          payload = {"files": {"fpl_stats.json": {"content": json.dumps(stats, indent=2)}}}
+          resp = requests.patch(gist_url, headers=gh_headers, json=payload)
+          resp.raise_for_status()
+          print(f"✅ Updated bootstrap + GW {gw_id} stats")
+          EOF
