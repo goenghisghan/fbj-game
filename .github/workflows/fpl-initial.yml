@@ -1,0 +1,74 @@
+name: FPL Initial Seed
+
+on:
+  workflow_dispatch:
+
+jobs:
+  seed:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.x"
+      - run: pip install requests
+      - name: Seed fpl_stats.json with fixtures, badges, bootstrap, past stats
+        env:
+          GIST_ID: ${{ secrets.GIST_ID }}
+          GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
+        run: |
+          python - <<'EOF'
+          import os, requests, json, sys
+          GIST_ID, GIST_TOKEN = os.environ["GIST_ID"], os.environ["GIST_TOKEN"]
+          headers = {"User-Agent": "Mozilla/5.0"}
+
+          def safe_get(url):
+              r = requests.get(url, headers=headers, timeout=30)
+              if r.status_code != 200:
+                  print(f"⚠️ Failed to fetch {url} ({r.status_code})")
+                  sys.exit(0)
+              try:
+                  return r.json()
+              except Exception:
+                  print(f"⚠️ Invalid JSON from {url}")
+                  sys.exit(0)
+
+          # Fixtures
+          fixtures = safe_get("https://fantasy.premierleague.com/api/fixtures/")
+
+          # Bootstrap → for finished GWs + players
+          bootstrap = safe_get("https://fantasy.premierleague.com/api/bootstrap-static/")
+          finished_gws = [e["id"] for e in bootstrap["events"] if e["finished"]]
+          players = bootstrap["elements"]
+
+          # Collect past GW stats
+          stats = {}
+          for i, p in enumerate(players, 1):
+              pid = p["id"]
+              url = f"https://fantasy.premierleague.com/api/element-summary/{pid}/"
+              try:
+                  summ = safe_get(url)
+              except SystemExit:
+                  continue
+              for h in summ.get("history", []):
+                  gw = h["round"]
+                  if gw in finished_gws:
+                      stats.setdefault(str(gw), {})[str(pid)] = h
+              if i % 50 == 0:
+                  print(f"Processed {i} players...")
+
+          # Bundle everything into single dataset
+          data = {
+              "fixtures": fixtures,
+              "badge_template": "https://resources.premierleague.com/premierleague/badges/70/t{}.png",
+              "bootstrap": bootstrap,   # include bootstrap snapshot too
+              "stats": stats
+          }
+
+          # Save to gist
+          gist_url = f"https://api.github.com/gists/{GIST_ID}"
+          gh_headers = {"Authorization": f"Bearer {GIST_TOKEN}"}
+          payload = {"files": {"fpl_stats.json": {"content": json.dumps(data, indent=2)}}}
+          resp = requests.patch(gist_url, headers=gh_headers, json=payload)
+          resp.raise_for_status()
+          print("✅ Seeded fpl_stats.json with fixtures, badges, bootstrap, and past GW stats")
+          EOF
