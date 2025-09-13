@@ -14,7 +14,20 @@ app.config.update(
 DB_PATH = os.environ.get('DB_PATH', 'users.db')
 
 # ----------------- GIST HANDLING -----------------
+import time
+
+_fpl_cache = None
+_fpl_cache_time = 0
+CACHE_TTL = 300  # 5 minutes in seconds
+
 def load_fpl_from_gist():
+    global _fpl_cache, _fpl_cache_time
+    now = time.time()
+
+    # Use cache if fresh
+    if _fpl_cache and (now - _fpl_cache_time < CACHE_TTL):
+        return _fpl_cache
+
     gist_id = os.getenv("GIST_ID")
     github_token = os.getenv("GITHUB_TOKEN")
     if not gist_id or not github_token:
@@ -28,15 +41,19 @@ def load_fpl_from_gist():
 
     file_info = gist_data["files"]["fpl_stats.json"]
 
-    # If GitHub truncated the content, fetch the raw_url instead
     if file_info.get("truncated"):
         raw_url = file_info["raw_url"]
         rr = requests.get(raw_url, headers=headers, timeout=60)
         rr.raise_for_status()
-        return rr.json()
+        data = rr.json()
+    else:
+        data = json.loads(file_info["content"])
 
-    # Otherwise load directly
-    return json.loads(file_info["content"])
+    # Save to cache
+    _fpl_cache = data
+    _fpl_cache_time = now
+    return data
+
 
 
 # ----------------- DB HANDLING -----------------
