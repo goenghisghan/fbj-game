@@ -113,17 +113,35 @@ def get_user_id(username):
     return r[0] if r else None
 
 def get_locked_picks(user_id, events):
+    """
+    Return the user's locked picks for the *current* gameweek
+    once that GW's deadline has passed. Before the deadline, nothing is locked.
+    """
     now = datetime.now(timezone.utc)
-    nxt = next((e for e in events if e.get('is_next')), None)
-    if nxt:
-        fromiso = datetime.fromisoformat(nxt['deadline_time'].replace('Z','+00:00'))
-        if now < fromiso:
-            return {}, None
+
+    # Find the current event, not the next
     cur_ev = next((e for e in events if e.get('is_current')), None)
-    if not cur_ev: return {}, None
+    if not cur_ev:
+        return {}, None  # no current GW in bootstrap
+
+    # Lock using the current GW deadline (not next GW)
+    deadline = datetime.fromisoformat(cur_ev['deadline_time'].replace('Z', '+00:00'))
+    if now < deadline:
+        # Before the current GW deadline: nothing is locked yet
+        return {}, None
+
+    # After the deadline: picks for this GW id are considered locked
     gw_id = cur_ev['id']
-    conn=db(); cur=conn.cursor(); cur.execute('SELECT position, player_id FROM picks WHERE user_id=? AND gameweek_id=?',(user_id,gw_id)); rows=cur.fetchall(); conn.close()
-    return ({pos:pid for pos,pid in rows}, gw_id)
+    conn = db()
+    cur = conn.cursor()
+    cur.execute(
+        'SELECT position, player_id FROM picks WHERE user_id=? AND gameweek_id=?',
+        (user_id, gw_id)
+    )
+    rows = cur.fetchall()
+    conn.close()
+    return ({pos: pid for pos, pid in rows}, gw_id)
+
 
 def get_pending_picks(user_id, events):
     nxt = next((e for e in events if e.get('is_next')), None)
@@ -193,7 +211,6 @@ def my_squad():
             hist=gw_stats_for_player(pid, gw_id)
             gw_pts=hist.get('total_points',0) if hist else 0
             total_points+=gw_pts
-            def_contrib=hist.get('defensive_contributions', hist.get('bps',0)) if hist else 0
             squad[pos]={
                 'name':f"{p.get('first_name','')} {p.get('second_name','')}".strip(),
                 'team_name':team_map[p['team']]['name'],
@@ -207,7 +224,7 @@ def my_squad():
                     'assists':hist.get('assists',0),
                     'goals_scored':hist.get('goals_scored',0),
                     'bonus':hist.get('bonus',0),
-                    'def_contrib':def_contrib,
+                    'def_contrib':hist.get('defensive_contribution',0),
                     'yellow_cards':hist.get('yellow_cards',0),
                     'red_cards':hist.get('red_cards',0),
                     'penalties_missed':hist.get('penalties_missed',0),
