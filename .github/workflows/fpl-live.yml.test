@@ -26,12 +26,21 @@ jobs:
           gist_url = f"https://api.github.com/gists/{GIST_ID}"
           gh_headers = {"Authorization": f"Bearer {GIST_TOKEN}"}
 
-          # Load existing data
-          r = requests.get(gist_url, headers=gh_headers)
+          # ---------------- Load existing data safely ----------------
+          r = requests.get(gist_url, headers=gh_headers, timeout=30)
           r.raise_for_status()
-          stats = json.loads(r.json()["files"]["fpl_stats.json"]["content"])
+          gist = r.json()
+          file_info = gist["files"]["fpl_stats.json"]
 
-          # Fetch bootstrap
+          if file_info.get("truncated"):
+              raw_url = file_info["raw_url"]
+              rr = requests.get(raw_url, headers=gh_headers, timeout=60)
+              rr.raise_for_status()
+              stats = rr.json()
+          else:
+              stats = json.loads(file_info["content"])
+
+          # ---------------- Fetch bootstrap ----------------
           r = requests.get("https://fantasy.premierleague.com/api/bootstrap-static/", headers=headers, timeout=30)
           if r.status_code != 200:
               print("⚠️ Bootstrap fetch failed, skipping update")
@@ -43,14 +52,14 @@ jobs:
               sys.exit(0)
           stats["bootstrap"] = bootstrap
 
-          # Current GW
+          # ---------------- Current GW ----------------
           current_event = next((e for e in bootstrap["events"] if e.get("is_current")), None)
           if not current_event:
               print("⚠️ No current GW found, skipping update")
               sys.exit(0)
           gw_id = current_event["id"]
 
-          # Fetch live GW stats
+          # ---------------- Fetch live GW stats ----------------
           r = requests.get(f"https://fantasy.premierleague.com/api/event/{gw_id}/live/", headers=headers, timeout=30)
           if r.status_code != 200:
               print(f"⚠️ Live GW fetch failed ({r.status_code}), skipping update")
@@ -61,10 +70,21 @@ jobs:
               print("⚠️ Invalid JSON for live GW, skipping update")
               sys.exit(0)
 
-          stats["stats"][str(gw_id)] = {str(pid): p["stats"] for pid, p in live["elements"].items()}
+          # Normalise into stats[gw][player_id]
+          stats.setdefault("stats", {})
+          stats["stats"][str(gw_id)] = {
+              str(pid): p.get("stats", {}) for pid, p in live.get("elements", {}).items()
+          }
+
+          # ---------------- Validate before writing ----------------
+          try:
+              json.dumps(stats)  # make sure it's serializable
+          except Exception as e:
+              print(f"⚠️ Skipping update, invalid JSON: {e}")
+              sys.exit(0)
 
           payload = {"files": {"fpl_stats.json": {"content": json.dumps(stats, indent=2)}}}
-          resp = requests.patch(gist_url, headers=gh_headers, json=payload)
+          resp = requests.patch(gist_url, headers=gh_headers, json=payload, timeout=60)
           resp.raise_for_status()
           print(f"✅ Updated bootstrap + GW {gw_id} stats")
           EOF
