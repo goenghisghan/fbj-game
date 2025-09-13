@@ -20,25 +20,29 @@ jobs:
         run: |
           python - <<'EOF'
           import os, requests, json, sys
-          GIST_ID, GIST_TOKEN = os.environ["GIST_ID"], os.environ["GIST_TOKEN"]
 
+          GIST_ID, GIST_TOKEN = os.environ["GIST_ID"], os.environ["GIST_TOKEN"]
           headers = {"User-Agent": "Mozilla/5.0"}
           gist_url = f"https://api.github.com/gists/{GIST_ID}"
           gh_headers = {"Authorization": f"Bearer {GIST_TOKEN}"}
 
-          # ---------------- Load existing data safely ----------------
-          r = requests.get(gist_url, headers=gh_headers, timeout=30)
-          r.raise_for_status()
-          gist = r.json()
-          file_info = gist["files"]["fpl_stats.json"]
+          def load_gist_json(gist_id, gh_headers):
+              gist_url = f"https://api.github.com/gists/{gist_id}"
+              r = requests.get(gist_url, headers=gh_headers, timeout=30)
+              r.raise_for_status()
+              gist = r.json()
+              file_info = gist["files"]["fpl_stats.json"]
 
-          if file_info.get("truncated"):
-              raw_url = file_info["raw_url"]
-              rr = requests.get(raw_url, headers=gh_headers, timeout=60)
-              rr.raise_for_status()
-              stats = rr.json()
-          else:
-              stats = json.loads(file_info["content"])
+              if file_info.get("truncated"):
+                  raw_url = file_info["raw_url"]
+                  rr = requests.get(raw_url, headers=gh_headers, timeout=60)
+                  rr.raise_for_status()
+                  return rr.json()
+              else:
+                  return json.loads(file_info["content"])
+
+          # ---------------- Load existing stats ----------------
+          stats = load_gist_json(GIST_ID, gh_headers)
 
           # ---------------- Fetch bootstrap ----------------
           r = requests.get("https://fantasy.premierleague.com/api/bootstrap-static/", headers=headers, timeout=30)
@@ -73,7 +77,7 @@ jobs:
           # Normalise into stats[gw][player_id]
           stats.setdefault("stats", {})
           stats["stats"][str(gw_id)] = {
-              str(pid): p.get("stats", {}) for pid, p in live.get("elements", {}).items()
+              str(p["id"]): p.get("stats", {}) for p in live.get("elements", [])
           }
 
           # ---------------- Validate before writing ----------------
