@@ -25,8 +25,19 @@ def load_fpl_from_gist():
     r = requests.get(url, headers=headers, timeout=30)
     r.raise_for_status()
     gist_data = r.json()
-    file_content = gist_data["files"]["fpl_stats.json"]["content"]
-    return json.loads(file_content)
+
+    file_info = gist_data["files"]["fpl_stats.json"]
+
+    # If GitHub truncated the content, fetch the raw_url instead
+    if file_info.get("truncated"):
+        raw_url = file_info["raw_url"]
+        rr = requests.get(raw_url, headers=headers, timeout=60)
+        rr.raise_for_status()
+        return rr.json()
+
+    # Otherwise load directly
+    return json.loads(file_info["content"])
+
 
 # ----------------- DB HANDLING -----------------
 def db():
