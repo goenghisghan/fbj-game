@@ -285,7 +285,7 @@ def pick_player():
         if pp: chosen_clubs.add(team_map[pp['team']]['name'])
     if team_map[player['team']]['name'] in chosen_clubs:
         return jsonify({'status':'error','msg':'Club already selected'}),400
-    print("Saving pick:", user_id, gw_next, position, player_id)
+    print("Saving pick:", uid, gw_next, position, player_id)
     conn=db(); cur=conn.cursor()
     cur.execute('INSERT INTO picks (user_id, gameweek_id, position, player_id) VALUES (?,?,?,?) ON CONFLICT(user_id, gameweek_id, position) DO UPDATE SET player_id=excluded.player_id',(uid,gw_next,position,player_id))
     conn.commit(); conn.close()
