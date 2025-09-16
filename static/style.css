@@ -92,15 +92,33 @@ a{color:#2563eb;text-decoration:none}a:hover{text-decoration:underline}
 }
 
 .nav img {
-  height: 46px;
+  height: 50px;
+}
+
+.nav-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+}
+
+.nav-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+  flex: 1;
 }
 
 .nav-links a {
   color: #fff;                       /* white text */
-  margin-right: 18px;
   padding: 6px 12px;
   border-radius: 8px;
   transition: background 0.2s, color 0.2s;
+  text-decoration: none;
 }
 
 .nav-links a:hover {
