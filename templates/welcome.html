@@ -2,9 +2,10 @@
 <div class="center" style="flex-direction:column;text-align:center">
   <img src="{{ url_for('static', filename='fbj_logo.png') }}" alt="FBJ logo" style="max-width:260px;margin:20px auto;">
   <h1>Welcome to FBJ</h1>
-  <div style="margin-top:10px">
+  <div class="welcome-links">
     <a class="btn btn-secondary" href="{{ url_for('squad') }}">Pick Team</a>
     <a class="btn" href="{{ url_for('my_squad') }}">GW Lineup</a>
     <a class="btn" href="{{ url_for('league') }}">League&nbsp;&amp;&nbsp;History</a>
   </div>
-</div>{% endblock %}
+</div>
+{% endblock %}
