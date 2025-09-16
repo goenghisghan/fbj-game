@@ -14,7 +14,7 @@
   {% endif %}
 </div>{% endfor %}
 </div>
-<button class="btn btn-danger" style="margin-top:10px" onclick="clearAll()">Clear All</button>
+<button class="clear-btn" onclick="clearAll()">Clear All</button>
 <form method="GET" class="filters">
   <label>Club <select name="club" onchange="this.form.submit()">
     <option value="">All</option>{% for c in clubs %}
