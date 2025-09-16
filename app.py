@@ -143,7 +143,10 @@ def get_locked_picks(user_id, events):
     if now < deadline: return {}, None
     gw_id = cur_ev['id']
     conn=db(); cur=conn.cursor()
-    cur.execute('SELECT position, player_id FROM picks WHERE user_id=%s AND gameweek_id=%s', (user_id, gw_id))
+    cur.execute(
+        'SELECT position, player_id FROM picks WHERE user_id=%s AND gameweek_id=%s',
+        (user_id, gw_id)
+    )
     rows = cur.fetchall()
     conn.close()
     return ({pos: pid for pos, pid in rows}, gw_id)
@@ -154,7 +157,10 @@ def get_pending_picks(user_id, events):
     if not nxt: return {}, None
     gw_id = nxt['id']
     conn=db(); cur=conn.cursor()
-    cur.execute('SELECT position, player_id FROM picks WHERE user_id=%s AND gameweek_id=%s', (user_id, gw_id))
+    cur.execute(
+        'SELECT position, player_id FROM picks WHERE user_id=%s AND gameweek_id=%s',
+        (user_id, gw_id)
+    )
     rows=cur.fetchall()
     conn.close()
     print("Loading pending picks:", user_id, gw_id, rows)
@@ -172,7 +178,10 @@ def all_users():
 
 def gw_stats_for_user(uid, gw_id):
     conn=db(); cur=conn.cursor()
-    cur.execute('SELECT position, player_id FROM picks WHERE user_id=%s AND gameweek_id=%s', (uid, gw_id))
+    cur.execute(
+        'SELECT position, player_id FROM picks WHERE user_id=%s AND gameweek_id=%s',
+        (uid, gw_id)
+    )
     rows=cur.fetchall(); conn.close()
     if not rows: return 0
     total=0
@@ -181,43 +190,59 @@ def gw_stats_for_user(uid, gw_id):
         total += hist.get('total_points',0) if hist else 0
     return total
 
+def get_gw_lineup_for_users(events, data):
+    cur_ev = next((e for e in events if e.get('is_current')), None)
+    if not cur_ev:
+        return [], None
+    gw_id = cur_ev['id']
+
+    team_map = {t['id']: t for t in data['teams']}
+    player_map = {p['id']: p for p in data['elements']}
+    users = all_users()
+
+    results = []
+    for u in users:
+        uid = u['id']
+        conn = db()
+        cur = conn.cursor()
+        cur.execute(
+            'SELECT position, player_id FROM picks WHERE user_id=%s AND gameweek_id=%s',
+            (uid, gw_id)
+        )
+        rows = cur.fetchall()
+        conn.close()
+        picks = {pos: pid for pos, pid in rows}
+
+        user_total = 0
+        lineup = {}
+        for pos in ["GK", "DEF", "MID", "FWD"]:
+            pid = picks.get(pos)
+            if pid and pid in player_map:
+                p = player_map[pid]
+                photo_id = p.get('photo', '').split('.')[0] if p.get('photo') else "placeholder"
+                photo_url = f'https://resources.premierleague.com/premierleague/photos/players/40x40/p{photo_id}.png'
+                hist = gw_stats_for_player(pid, gw_id) or {}
+                pts = hist.get('total_points', 0)
+                user_total += pts
+                lineup[pos] = {
+                    "name": f"{p.get('first_name','')} {p.get('second_name','')}".strip(),
+                    "photo_url": photo_url,
+                    "points": pts,
+                }
+            else:
+                lineup[pos] = {
+                    "name": None,
+                    "photo_url": url_for('static', filename='question.png'),
+                    "points": 0,
+                }
+        results.append({
+            "username": u['username'],
+            "lineup": lineup,
+            "total": user_total
+        })
+    return results, gw_id
+
 # ----------------- ROUTES -----------------
-@app.route('/')
-def root(): return redirect(url_for('login'))
-
-@app.route('/register', methods=['GET','POST'])
-def register():
-    if request.method=='POST':
-        u=request.form['username'].strip(); p=request.form['password']
-        try:
-            conn=db(); cur=conn.cursor()
-            cur.execute('INSERT INTO users (username,password) VALUES (%s,%s)', (u, generate_password_hash(p)))
-            conn.commit(); conn.close()
-            flash('Registration successful! Please login.','success'); return redirect(url_for('login'))
-        except psycopg2.Error:
-            flash('Username already exists.','danger')
-    return render_template('register.html',title='Register')
-
-@app.route('/login', methods=['GET','POST'])
-def login():
-    if request.method=='POST':
-        u=request.form['username'].strip(); p=request.form['password']
-        conn=db(); cur=conn.cursor()
-        cur.execute('SELECT * FROM users WHERE username=%s', (u,))
-        user=cur.fetchone(); conn.close()
-        if user and check_password_hash(user[2],p):
-            session['username']=u; return redirect(url_for('welcome'))
-        flash('Invalid username or password.','danger')
-    return render_template('login.html',title='Login')
-
-@app.route('/logout')
-def logout(): session.clear(); flash('Logged out.','info'); return redirect(url_for('login'))
-
-@app.route('/welcome')
-def welcome():
-    if 'username' not in session: return redirect(url_for('login'))
-    return render_template('welcome.html',title='Welcome')
-
 @app.route('/my_squad')
 def my_squad():
     if 'username' not in session: return redirect(url_for('login'))
@@ -240,7 +265,7 @@ def my_squad():
             total_points+=gw_pts
             squad[pos]={
                 'name':f"{p.get('first_name','')} {p.get('second_name','')}".strip(),
-                'team_name':team_map[p['team']]['name'],
+                'team_name':teams[p['team']]['name'],
                 'photo_url':photo_url,
                 'gw_points':gw_pts,
                 'stats': ({
@@ -258,7 +283,16 @@ def my_squad():
                     'own_goals':hist.get('own_goals',0),
                 } if hist else None)
             }
-    return render_template('my_squad.html',title='GW Lineup',username=username,total_points=total_points,squad=squad)
+    league_lineups, gw_id_all = get_gw_lineup_for_users(events, data)
+    return render_template(
+        'my_squad.html',
+        title='GW Lineup',
+        username=username,
+        total_points=total_points,
+        squad=squad,
+        league_lineups=league_lineups,
+        gw_id_all=gw_id_all
+    )
 
 @app.route('/squad')
 def squad():
