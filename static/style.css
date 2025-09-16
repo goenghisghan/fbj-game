@@ -10,7 +10,7 @@ a{color:#2563eb;text-decoration:none}a:hover{text-decoration:underline}
 .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}@media (max-width:900px){.grid{grid-template-columns:repeat(2,1fr)}}@media (max-width:580px){.grid{grid-template-columns:1fr}}
 .player-card{padding:16px;text-align:center}.player-pos{font-weight:700;margin-bottom:8px;color:#374151}.player-photo{width:110px;height:140px;object-fit:cover;border-radius:8px;border:1px solid #e5e7eb;background:#fff;margin:6px auto}
 .meta{font-size:14px;color:#4b5563;margin-top:6px}.table{width:100%;border-collapse:collapse}.table th,.table td{padding:8px;border-bottom:1px solid #e5e7eb;text-align:left}.table th{background:#f9fafb}
-.filters{display:flex;gap:10px;align-items:center;margin-bottom:10px}.pagination{margin-top:10px}
+.pagination{margin-top:10px}
 .scale-wrap {
   margin: 16px 0;
 }
@@ -140,4 +140,47 @@ a{color:#2563eb;text-decoration:none}a:hover{text-decoration:underline}
 }
 .table.picks td strong {
   font-size: 14px;
+}
+.clear-btn {
+  display: block;
+  margin: 20px auto;     /* space above and below */
+  padding: 10px 16px;
+  background: #ef4444;   /* red */
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-family: 'Chivo', sans-serif;
+  font-size: 15px;
+  cursor: pointer;
+}
+.clear-btn:hover {
+  background: #dc2626;
+}
+
+.filters {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin: 20px 0;   /* more vertical spacing */
+  font-family: 'Chivo', sans-serif;
+}
+
+.filters label {
+  font-weight: 600;
+}
+
+.filters select {
+  padding: 6px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: 'Chivo', sans-serif;  /* enforce Chivo font */
+  background: #f9fafb;               /* subtle gray background */
+  color: #111827;                    /* dark gray text */
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.filters select:hover {
+  background: #f3f4f6;               /* slightly darker on hover */
 }
