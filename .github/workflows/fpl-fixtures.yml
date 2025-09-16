@@ -1,0 +1,83 @@
+name: FPL Fixtures Update
+
+on:
+  schedule:
+    - cron: "0 6 */2 * *"   # every 2 days at 06:00 UTC
+  workflow_dispatch:
+
+jobs:
+  update-fixtures:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.x"
+      - run: pip install requests
+      - name: Update fixtures in fpl_stats.json
+        env:
+          GIST_ID: ${{ secrets.GIST_ID }}
+          GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
+        run: |
+          python - <<'EOF'
+          import os, requests, json, sys
+
+          GIST_ID, GIST_TOKEN = os.environ["GIST_ID"], os.environ["GIST_TOKEN"]
+          headers = {"User-Agent": "Mozilla/5.0"}
+          gh_headers = {"Authorization": f"Bearer {GIST_TOKEN}"}
+
+          def safe_get(url):
+              try:
+                  r = requests.get(url, headers=headers, timeout=30)
+                  if r.status_code != 200:
+                      print(f"⚠️ Failed to fetch {url} ({r.status_code})")
+                      return None
+                  return r.json()
+              except Exception as e:
+                  print(f"⚠️ Error fetching {url}: {e}")
+                  return None
+
+          # Get new fixtures
+          fixtures = safe_get("https://fantasy.premierleague.com/api/fixtures/")
+          if not fixtures:
+              print("⚠️ Skipping update — fixtures fetch failed")
+              sys.exit(0)
+
+          # Load existing dataset
+          gist_url = f"https://api.github.com/gists/{GIST_ID}"
+          try:
+              r = requests.get(gist_url, headers=gh_headers)
+              r.raise_for_status()
+              gist_data = r.json()
+              file_info = gist_data["files"]["fpl_stats.json"]
+
+              # Handle truncation properly
+              if file_info.get("truncated"):
+                  raw_url = file_info["raw_url"]
+                  rr = requests.get(raw_url, headers=gh_headers, timeout=60)
+                  rr.raise_for_status()
+                  stats = rr.json()
+              else:
+                  stats = json.loads(file_info["content"])
+          except Exception as e:
+              print(f"⚠️ Failed to load existing gist data: {e}")
+              sys.exit(0)
+
+          # Update only fixtures
+          stats["fixtures"] = fixtures
+
+          # Save back full dataset
+          payload = {
+              "files": {
+                  "fpl_stats.json": {
+                      "content": json.dumps(stats, indent=2)
+                  }
+              }
+          }
+          try:
+              resp = requests.patch(gist_url, headers=gh_headers, json=payload)
+              resp.raise_for_status()
+              print("✅ Fixtures updated in fpl_stats.json")
+          except Exception as e:
+              print(f"⚠️ Failed to save updated gist: {e}")
+              sys.exit(0)
+          EOF
