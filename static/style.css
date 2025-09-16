@@ -18,27 +18,18 @@ a{color:#2563eb;text-decoration:none}a:hover{text-decoration:underline}
 .marker-dot{position:absolute;top:26px;width:10px;height:10px;background:#111827;border-radius:50%;transform:translateX(-50%);z-index:2}
 .stats{font-size:13px;text-align:left;margin-top:6px}.stats details{background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:8px}.stats summary{cursor:pointer;font-weight:600}
 .stats ul{margin:6px 0 0 16px;padding:0}.stats li{margin:3px 0}.kit-img{width:56px;height:auto;display:block;margin:6px auto}
-/* Prevent nav links from splitting across lines */
-.nav-links a {
-  white-space: nowrap;
+/* Welcome page buttons */
+.welcome-links {
+  display: flex;
+  flex-wrap: wrap;         /* allow wrapping */
+  justify-content: center; /* center items on each line */
+  gap: 12px;               /* space between buttons */
+  margin-top: 16px;
 }
 
-/* On small screens, let links stack neatly */
-@media (max-width:600px) {
-  .nav-inner {
-    flex-wrap: wrap;
-  }
-  .nav-links {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    width: 100%;
-    justify-content: center;
-    margin-top: 8px;
-  }
-  .nav-links a {
-    flex: 1 1 auto;
-    text-align: center;
-  }
+.welcome-links a {
+  text-align: center;
+  padding: 12px 20px;
+  border-radius: 8px;
+  white-space: nowrap;     /* keep label together */
 }
-
