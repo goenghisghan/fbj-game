@@ -184,3 +184,15 @@ a{color:#2563eb;text-decoration:none}a:hover{text-decoration:underline}
 .filters select:hover {
   background: #f3f4f6;               /* slightly darker on hover */
 }
+
+.gw-banner {
+  display: inline-blocks;
+  background: #2563eb;
+  color: #fff;
+  font-family: 'Chivo', sans-serif;
+  font-weight: 700;
+  font-size: 18px;
+  padding: 6px 14px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
