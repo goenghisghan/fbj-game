@@ -7,7 +7,7 @@
     {% endfor %}
     <div class="seg bust {% if total_points<=21 %}faded{% endif %}">BUST</div>
     {% set clamped = total_points if total_points<=22 else 22 %}
-    {% set percent = ((clamped+0.5)/23*100) }
+    {% set percent = (100*(clamped+0.5)/23) }
     <div class="marker" style="left: {{ percent }}%"></div>
   </div>
 </div>
