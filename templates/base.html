@@ -10,20 +10,31 @@
    }
 </style>
 </head><body>
-<div class="nav"><div class="nav-inner">
-  <div><a href="{{ url_for('welcome') }}"><img src="{{ url_for('static', filename='fbj_logo.png') }}" alt="FBJ"></a></div>
-  <div class="nav-links">
-    {% if session.get('username') %}
-      <a href="{{ url_for('squad') }}">Pick Team</a>
-      <a href="{{ url_for('my_squad') }}">GW Lineup</a>
-      <a href="{{ url_for('league') }}">League &amp; History</a>
-      <a href="{{ url_for('logout') }}">Logout</a>
-    {% else %}
-      <a href="{{ url_for('login') }}">Login</a>
-      <a href="{{ url_for('register') }}">Register</a>
-    {% endif %}
+<div class="nav">
+  <div class="nav-inner">
+    <div>
+      <a href="{{ url_for('welcome') }}">
+        <img src="{{ url_for('static', filename='fbj_logo.png') }}" alt="FBJ">
+      </a>
+    </div>
+    <div class="nav-links">
+      {% if session.get('username') %}
+        <a href="{{ url_for('squad') }}" 
+           class="{% if request.endpoint == 'squad' %}active{% endif %}">Pick Team</a>
+        <a href="{{ url_for('my_squad') }}" 
+           class="{% if request.endpoint == 'my_squad' %}active{% endif %}">GW Lineup</a>
+        <a href="{{ url_for('league') }}" 
+           class="{% if request.endpoint == 'league' %}active{% endif %}">League &amp; History</a>
+        <a href="{{ url_for('logout') }}">Logout</a>
+      {% else %}
+        <a href="{{ url_for('login') }}" 
+           class="{% if request.endpoint == 'login' %}active{% endif %}">Login</a>
+        <a href="{{ url_for('register') }}" 
+           class="{% if request.endpoint == 'register' %}active{% endif %}">Register</a>
+      {% endif %}
+    </div>
   </div>
-</div></div>
+</div>
 <div class="container">
   {% with messages = get_flashed_messages(with_categories=true) %}
     {% if messages %}
