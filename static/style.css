@@ -205,8 +205,9 @@ a{color:#2563eb;text-decoration:none}a:hover{text-decoration:underline}
 
 .gw-banner {
   display: inline-blocks;
+  text-align: center;
   background: #2563eb;
-  color: #fff;
+  color: #dc2626;
   font-family: 'Chivo', sans-serif;
   font-weight: 700;
   font-size: 18px;
