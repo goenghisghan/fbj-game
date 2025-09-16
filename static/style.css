@@ -63,7 +63,7 @@ a{color:#2563eb;text-decoration:none}a:hover{text-decoration:underline}
   height: 0;
   border-left: 8px solid transparent;
   border-right: 8px solid transparent;
-  border-top: 12px solid #111827; /* black triangle */
+  border-bottom: 12px solid red; /* red triangle */
   transform: translateX(-50%);
   z-index: 10;
 }
