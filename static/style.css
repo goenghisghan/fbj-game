@@ -56,3 +56,8 @@ a{color:#2563eb;text-decoration:none}a:hover{text-decoration:underline}
   background: #222;                  /* dark grey hover */
   color: #f3f4f6;                    /* light grey text on hover */
 }
+
+.nav-links a.active {
+  background: #2563eb;   /* blue highlight */
+  color: #fff;
+}
