@@ -1,4 +1,5 @@
-import os, sqlite3, requests, json
+import os, requests, json, time
+import psycopg2, psycopg2.extras
 from datetime import datetime, timezone
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -11,20 +12,17 @@ app.config.update(
     SESSION_COOKIE_SECURE=True,
 )
 
-DB_PATH = os.environ.get('DB_PATH', 'users.db')
+DATABASE_URL = os.environ.get("DATABASE_URL")  # Supabase Postgres connection string
 
 # ----------------- GIST HANDLING -----------------
-import time
-
 _fpl_cache = None
 _fpl_cache_time = 0
-CACHE_TTL = 300  # 5 minutes in seconds
+CACHE_TTL = 300  # 5 minutes
 
 def load_fpl_from_gist():
     global _fpl_cache, _fpl_cache_time
     now = time.time()
 
-    # Use cache if fresh
     if _fpl_cache and (now - _fpl_cache_time < CACHE_TTL):
         return _fpl_cache
 
@@ -40,33 +38,55 @@ def load_fpl_from_gist():
     gist_data = r.json()
 
     file_info = gist_data["files"]["fpl_stats.json"]
-
     if file_info.get("truncated"):
-        raw_url = file_info["raw_url"]
-        rr = requests.get(raw_url, headers=headers, timeout=60)
+        rr = requests.get(file_info["raw_url"], headers=headers, timeout=60)
         rr.raise_for_status()
         data = rr.json()
     else:
         data = json.loads(file_info["content"])
 
-    # Save to cache
     _fpl_cache = data
     _fpl_cache_time = now
     return data
 
-
-
 # ----------------- DB HANDLING -----------------
 def db():
-    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True) if os.path.dirname(DB_PATH) else None
-    return sqlite3.connect(DB_PATH)
+    return psycopg2.connect(DATABASE_URL, sslmode="require")
 
 def init_db():
     conn = db(); cur = conn.cursor()
-    cur.execute('CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE NOT NULL, password TEXT NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);')
-    cur.execute('CREATE TABLE IF NOT EXISTS picks (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, gameweek_id INTEGER NOT NULL, position TEXT NOT NULL, player_id INTEGER NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, UNIQUE(user_id, gameweek_id, position));')
-    cur.execute('CREATE TABLE IF NOT EXISTS results (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, gameweek_id INTEGER NOT NULL, gw_points INTEGER NOT NULL, league_points INTEGER NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, UNIQUE(user_id, gameweek_id));')
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id SERIAL PRIMARY KEY,
+            username TEXT UNIQUE NOT NULL,
+            password TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+    """)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS picks (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id),
+            gameweek_id INTEGER NOT NULL,
+            position TEXT NOT NULL,
+            player_id INTEGER NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(user_id, gameweek_id, position)
+        );
+    """)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS results (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id),
+            gameweek_id INTEGER NOT NULL,
+            gw_points INTEGER NOT NULL,
+            league_points INTEGER NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(user_id, gameweek_id)
+        );
+    """)
     conn.commit(); conn.close()
+
 init_db()
 
 # ----------------- FPL HELPERS -----------------
@@ -109,52 +129,57 @@ def decorate_players(players,teams,positions,opp_map):
     return out
 
 def get_user_id(username):
-    conn=db(); cur=conn.cursor(); cur.execute('SELECT id FROM users WHERE username=?',(username,)); r=cur.fetchone(); conn.close()
+    conn=db(); cur=conn.cursor()
+    cur.execute('SELECT id FROM users WHERE username=%s', (username,))
+    r=cur.fetchone()
+    conn.close()
     return r[0] if r else None
 
 def get_locked_picks(user_id, events):
-    """
-    Return the user's locked picks for the *current* gameweek
-    once that GW's deadline has passed. Before the deadline, nothing is locked.
-    """
     now = datetime.now(timezone.utc)
-
-    # Find the current event, not the next
     cur_ev = next((e for e in events if e.get('is_current')), None)
-    if not cur_ev:
-        return {}, None  # no current GW in bootstrap
-
-    # Lock using the current GW deadline (not next GW)
-    deadline = datetime.fromisoformat(cur_ev['deadline_time'].replace('Z', '+00:00'))
-    if now < deadline:
-        # Before the current GW deadline: nothing is locked yet
-        return {}, None
-
-    # After the deadline: picks for this GW id are considered locked
+    if not cur_ev: return {}, None
+    deadline = datetime.fromisoformat(cur_ev['deadline_time'].replace('Z','+00:00'))
+    if now < deadline: return {}, None
     gw_id = cur_ev['id']
-    conn = db()
-    cur = conn.cursor()
-    cur.execute(
-        'SELECT position, player_id FROM picks WHERE user_id=? AND gameweek_id=?',
-        (user_id, gw_id)
-    )
+    conn=db(); cur=conn.cursor()
+    cur.execute('SELECT position, player_id FROM picks WHERE user_id=%s AND gameweek_id=%s', (user_id, gw_id))
     rows = cur.fetchall()
     conn.close()
     return ({pos: pid for pos, pid in rows}, gw_id)
-
 
 def get_pending_picks(user_id, events):
     nxt = next((e for e in events if e.get('is_next')), None)
     if not nxt: nxt = next((e for e in events if not e.get('finished')), None)
     if not nxt: return {}, None
     gw_id = nxt['id']
-    conn=db(); cur=conn.cursor(); cur.execute('SELECT position, player_id FROM picks WHERE user_id=? AND gameweek_id=?',(user_id,gw_id)); rows=cur.fetchall(); conn.close()
+    conn=db(); cur=conn.cursor()
+    cur.execute('SELECT position, player_id FROM picks WHERE user_id=%s AND gameweek_id=%s', (user_id, gw_id))
+    rows=cur.fetchall()
+    conn.close()
     print("Loading pending picks:", user_id, gw_id, rows)
     return ({pos:pid for pos,pid in rows}, gw_id)
 
 def gw_stats_for_player(player_id, gw_round):
     data = load_fpl_from_gist()
     return data.get("stats", {}).get(str(gw_round), {}).get(str(player_id), {})
+
+def all_users():
+    conn=db(); cur=conn.cursor()
+    cur.execute('SELECT id, username FROM users ORDER BY username ASC')
+    rows=cur.fetchall(); conn.close()
+    return [{'id':r[0],'username':r[1]} for r in rows]
+
+def gw_stats_for_user(uid, gw_id):
+    conn=db(); cur=conn.cursor()
+    cur.execute('SELECT position, player_id FROM picks WHERE user_id=%s AND gameweek_id=%s', (uid, gw_id))
+    rows=cur.fetchall(); conn.close()
+    if not rows: return 0
+    total=0
+    for _, pid in rows:
+        hist=gw_stats_for_player(pid, gw_id)
+        total += hist.get('total_points',0) if hist else 0
+    return total
 
 # ----------------- ROUTES -----------------
 @app.route('/')
@@ -166,10 +191,10 @@ def register():
         u=request.form['username'].strip(); p=request.form['password']
         try:
             conn=db(); cur=conn.cursor()
-            cur.execute('INSERT INTO users (username,password) VALUES (?,?)',(u,generate_password_hash(p)))
+            cur.execute('INSERT INTO users (username,password) VALUES (%s,%s)', (u, generate_password_hash(p)))
             conn.commit(); conn.close()
             flash('Registration successful! Please login.','success'); return redirect(url_for('login'))
-        except sqlite3.IntegrityError:
+        except psycopg2.Error:
             flash('Username already exists.','danger')
     return render_template('register.html',title='Register')
 
@@ -177,7 +202,8 @@ def register():
 def login():
     if request.method=='POST':
         u=request.form['username'].strip(); p=request.form['password']
-        conn=db(); cur=conn.cursor(); cur.execute('SELECT * FROM users WHERE username=?',(u,))
+        conn=db(); cur=conn.cursor()
+        cur.execute('SELECT * FROM users WHERE username=%s', (u,))
         user=cur.fetchone(); conn.close()
         if user and check_password_hash(user[2],p):
             session['username']=u; return redirect(url_for('welcome'))
@@ -287,7 +313,12 @@ def pick_player():
         return jsonify({'status':'error','msg':'Club already selected'}),400
     print("Saving pick:", uid, gw_next, position, player_id)
     conn=db(); cur=conn.cursor()
-    cur.execute('INSERT INTO picks (user_id, gameweek_id, position, player_id) VALUES (?,?,?,?) ON CONFLICT(user_id, gameweek_id, position) DO UPDATE SET player_id=excluded.player_id',(uid,gw_next,position,player_id))
+    cur.execute("""
+        INSERT INTO picks (user_id, gameweek_id, position, player_id)
+        VALUES (%s, %s, %s, %s)
+        ON CONFLICT (user_id, gameweek_id, position)
+        DO UPDATE SET player_id = EXCLUDED.player_id
+    """, (uid, gw_next, position, player_id))
     conn.commit(); conn.close()
     return jsonify({'status':'ok'})
 
@@ -298,7 +329,9 @@ def remove_player():
     username=session['username']; uid=get_user_id(username)
     data,teams,positions,events=bootstrap()
     pending, gw_next = get_pending_picks(uid, events)
-    conn=db(); cur=conn.cursor(); cur.execute('DELETE FROM picks WHERE user_id=? AND gameweek_id=? AND position=?',(uid,gw_next,position)); conn.commit(); conn.close()
+    conn=db(); cur=conn.cursor()
+    cur.execute('DELETE FROM picks WHERE user_id=%s AND gameweek_id=%s AND position=%s', (uid, gw_next, position))
+    conn.commit(); conn.close()
     return jsonify({'status':'ok'})
 
 @app.route('/clear_team', methods=['POST'])
@@ -307,21 +340,10 @@ def clear_team():
     username=session['username']; uid=get_user_id(username)
     data,teams,positions,events=bootstrap()
     pending, gw_next = get_pending_picks(uid, events)
-    conn=db(); cur=conn.cursor(); cur.execute('DELETE FROM picks WHERE user_id=? AND gameweek_id=?',(uid,gw_next)); conn.commit(); conn.close()
+    conn=db(); cur=conn.cursor()
+    cur.execute('DELETE FROM picks WHERE user_id=%s AND gameweek_id=%s', (uid, gw_next))
+    conn.commit(); conn.close()
     return jsonify({'status':'ok'})
-
-def all_users():
-    conn=db(); cur=conn.cursor(); cur.execute('SELECT id, username FROM users ORDER BY username ASC'); rows=cur.fetchall(); conn.close()
-    return [{'id':r[0],'username':r[1]} for r in rows]
-
-def gw_stats_for_user(uid, gw_id):
-    conn=db(); cur=conn.cursor(); cur.execute('SELECT position, player_id FROM picks WHERE user_id=? AND gameweek_id=?',(uid,gw_id)); rows=cur.fetchall(); conn.close()
-    if not rows: return 0
-    total=0
-    for _, pid in rows:
-        hist=gw_stats_for_player(pid, gw_id)
-        total += hist.get('total_points',0) if hist else 0
-    return total
 
 @app.route('/league', methods=['GET'])
 def league():
@@ -329,7 +351,17 @@ def league():
     data,teams,positions,events=bootstrap()
     users=all_users()
     conn=db(); cur=conn.cursor()
-    cur.execute('SELECT u.username, COALESCE(SUM(r.league_points),0) as total_lp, CASE WHEN COUNT(r.gw_points)>0 THEN AVG(CASE WHEN r.gw_points BETWEEN 0 AND 21 THEN r.gw_points ELSE 0 END) ELSE 0 END as avg_gw FROM users u LEFT JOIN results r ON r.user_id=u.id GROUP BY u.id ORDER BY total_lp DESC, avg_gw DESC, u.username ASC')
+    cur.execute("""
+        SELECT u.username,
+               COALESCE(SUM(r.league_points),0) as total_lp,
+               CASE WHEN COUNT(r.gw_points)>0
+                    THEN AVG(CASE WHEN r.gw_points BETWEEN 0 AND 21 THEN r.gw_points ELSE 0 END)
+                    ELSE 0 END as avg_gw
+        FROM users u
+        LEFT JOIN results r ON r.user_id=u.id
+        GROUP BY u.id
+        ORDER BY total_lp DESC, avg_gw DESC, u.username ASC
+    """)
     league_rows=[{'username':r[0],'total_lp':int(r[1]),'avg_gw':float(r[2])} for r in cur.fetchall()]
 
     sel_gw=request.args.get('gw',type=int)
@@ -338,7 +370,7 @@ def league():
     default_gw = cur_ev['id'] if cur_ev else (nxt_ev['id'] if nxt_ev else 1)
     selected_gw = sel_gw or default_gw
 
-    cur.execute('SELECT user_id, gw_points, league_points FROM results WHERE gameweek_id=?',(selected_gw,))
+    cur.execute('SELECT user_id, gw_points, league_points FROM results WHERE gameweek_id=%s', (selected_gw,))
     resmap={row[0]:{'gw_points':row[1],'league_points':row[2]} for row in cur.fetchall()}
     history_rows=[]
     for u in users:
@@ -355,7 +387,15 @@ def league():
     can_finalize=bool(relevant) and all(f.get('finished') for f in relevant)
 
     all_gws=[{'id':e['id']} for e in events]
-    return render_template('league.html',title='League & History',league_rows=league_rows,history_rows=history_rows,all_gws=all_gws,selected_gw=selected_gw,can_finalize=can_finalize)
+    return render_template(
+        'league.html',
+        title='League & History',
+        league_rows=league_rows,
+        history_rows=history_rows,
+        all_gws=all_gws,
+        selected_gw=selected_gw,
+        can_finalize=can_finalize
+    )
 
 @app.route('/finalize_gw', methods=['POST'])
 def finalize_gw():
@@ -369,7 +409,13 @@ def finalize_gw():
     conn=db(); cur=conn.cursor()
     for u in users:
         gwp=gw_stats_for_user(u['id'], selected_gw); lp=league_points_from_total(gwp)
-        cur.execute('INSERT OR REPLACE INTO results (user_id, gameweek_id, gw_points, league_points) VALUES (?,?,?,?)',(u['id'],selected_gw,gwp,lp))
+        cur.execute("""
+            INSERT INTO results (user_id, gameweek_id, gw_points, league_points)
+            VALUES (%s, %s, %s, %s)
+            ON CONFLICT (user_id, gameweek_id)
+            DO UPDATE SET gw_points = EXCLUDED.gw_points,
+                          league_points = EXCLUDED.league_points
+        """, (u['id'], selected_gw, gwp, lp))
     conn.commit(); conn.close()
     flash(f'Finalized GW {selected_gw} results.','success')
     return redirect(url_for('league', gw=selected_gw))
