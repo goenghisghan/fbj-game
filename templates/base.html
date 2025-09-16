@@ -22,7 +22,7 @@
         <a href="{{ url_for('squad') }}" 
            class="{% if request.endpoint == 'squad' %}active{% endif %}">Pick Team</a>
         <a href="{{ url_for('my_squad') }}" 
-           class="{% if request.endpoint == 'my_squad' %}active{% endif %}">GW Lineup</a>
+           class="{% if request.endpoint == 'my_squad' %}active{% endif %}">Live GW</a>
         <a href="{{ url_for('league') }}" 
            class="{% if request.endpoint == 'league' %}active{% endif %}">League &amp; History</a>
         <a href="{{ url_for('logout') }}">Logout</a>
