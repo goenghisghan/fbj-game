@@ -70,3 +70,32 @@ a{color:#2563eb;text-decoration:none}a:hover{text-decoration:underline}
   background: #2563eb;   /* blue highlight */
   color: #fff;
 }
+
+/* League picks table (GW Lineup) */
+.table.picks {
+  font-size: 13px;
+  border-collapse: collapse;
+  margin-top: 12px;
+  width: 100%;
+}
+.table.picks th,
+.table.picks td {
+  padding: 6px 8px;
+  border-bottom: 1px solid #e5e7eb;
+  text-align: left;
+  vertical-align: middle;
+}
+.table.picks th {
+  background: #f9fafb;
+  font-weight: 600;
+}
+.table.picks img {
+  width: 20px;
+  height: 26px;
+  vertical-align: middle;
+  margin-right: 4px;
+  border-radius: 4px;
+}
+.table.picks td strong {
+  font-size: 14px;
+}
