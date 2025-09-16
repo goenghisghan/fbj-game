@@ -1,4 +1,7 @@
 {% extends "base.html" %}{% block content %}
+<div class="gw-banner">
+  GW{{ gw_id_all }} Live
+</div>
 <h2>{{ username }} – Total points: {{ total_points }}</h2>
 <div class="scale-wrap">
   <div class="scale">
@@ -47,7 +50,7 @@
 </div>
 {% endfor %}
 </div>
-<h3 style="margin-top:24px">League Picks – GW {{ gw_id_all }}</h3>
+<h3 style="margin-top:24px">League Picks</h3>
 <table class="table picks">
   <thead>
     <tr>
