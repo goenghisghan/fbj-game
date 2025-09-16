@@ -48,3 +48,35 @@
 {% endfor %}
 </div>
 {% endblock %}
+<h3 style="margin-top:24px">League Picks – GW {{ gw_id_all }}</h3>
+<table class="table">
+  <thead>
+    <tr>
+      <th>User</th>
+      <th>GK</th>
+      <th>DEF</th>
+      <th>MID</th>
+      <th>FWD</th>
+      <th>Total</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for u in league_lineups %}
+    <tr>
+      <td>{{ u.username }}</td>
+      {% for pos in ["GK","DEF","MID","FWD"] %}
+      <td>
+        {% if u.lineup[pos].name %}
+          <img src="{{ u.lineup[pos].photo_url }}" alt="photo" style="width:24px;height:30px;vertical-align:middle;margin-right:4px">
+          {{ u.lineup[pos].name }} ({{ u.lineup[pos].points }})
+        {% else %}
+          <img src="{{ u.lineup[pos].photo_url }}" alt="?" style="width:24px;height:30px;vertical-align:middle;margin-right:4px">
+          None (0)
+        {% endif %}
+      </td>
+      {% endfor %}
+      <td><strong>{{ u.total }}</strong></td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
