@@ -243,6 +243,55 @@ def get_gw_lineup_for_users(events, data):
     return results, gw_id
 
 # ----------------- ROUTES -----------------
+@app.route('/')
+def root():
+    return redirect(url_for('login'))
+
+@app.route('/register', methods=['GET','POST'])
+def register():
+    if request.method == 'POST':
+        u = request.form['username'].strip()
+        p = request.form['password']
+        try:
+            conn = db(); cur = conn.cursor()
+            cur.execute(
+                'INSERT INTO users (username, password) VALUES (%s, %s)',
+                (u, generate_password_hash(p))
+            )
+            conn.commit(); conn.close()
+            flash('Registration successful! Please login.', 'success')
+            return redirect(url_for('login'))
+        except psycopg2.Error:
+            flash('Username already exists.', 'danger')
+    return render_template('register.html', title='Register')
+
+@app.route('/login', methods=['GET','POST'])
+def login():
+    if request.method == 'POST':
+        u = request.form['username'].strip()
+        p = request.form['password']
+        conn = db(); cur = conn.cursor()
+        cur.execute('SELECT id, username, password FROM users WHERE username=%s', (u,))
+        user = cur.fetchone()
+        conn.close()
+        if user and check_password_hash(user[2], p):
+            session['username'] = user[1]
+            return redirect(url_for('welcome'))
+        flash('Invalid username or password.', 'danger')
+    return render_template('login.html', title='Login')
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    flash('Logged out.', 'info')
+    return redirect(url_for('login'))
+
+@app.route('/welcome')
+def welcome():
+    if 'username' not in session:
+        return redirect(url_for('login'))
+    return render_template('welcome.html', title='Welcome')
+
 @app.route('/my_squad')
 def my_squad():
     if 'username' not in session: return redirect(url_for('login'))
