@@ -33,3 +33,26 @@ a{color:#2563eb;text-decoration:none}a:hover{text-decoration:underline}
   border-radius: 8px;
   white-space: nowrap;     /* keep label together */
 }
+
+/* Navigation bar */
+.nav {
+  background: #000;                  /* black background */
+  border-bottom: 1px solid #111;     /* subtle darker divider */
+}
+
+.nav img {
+  height: 46px;
+}
+
+.nav-links a {
+  color: #fff;                       /* white text */
+  margin-right: 18px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  transition: background 0.2s, color 0.2s;
+}
+
+.nav-links a:hover {
+  background: #222;                  /* dark grey hover */
+  color: #f3f4f6;                    /* light grey text on hover */
+}
