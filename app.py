@@ -353,6 +353,10 @@ def new_login():
 
     return render_template("new_login.html", title="Login")
 
+@app.route('/reset_request')
+def reset_request():
+    flash("Password reset not implemented yet.", "info")
+    return redirec(url_for('new_login'))
 
 @app.route('/logout')
 def logout():
