@@ -81,8 +81,12 @@ def init_db():
     cur.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id SERIAL PRIMARY KEY,
-            username TEXT UNIQUE NOT NULL,
+            email TEXT UNIQUE NOT NULL,
+            first_name TEXT NOT NULL,
+            last_name TEXT NOT NULL,
             password TEXT NOT NULL,
+            is_confirmed BOOLEAN DEFAULT FALSE,
+            confirmation_token TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
     """)
@@ -151,9 +155,9 @@ def decorate_players(players,teams,positions,opp_map):
         out.append(d)
     return out
 
-def get_user_id(username):
+def get_user_id(email):
     conn=db(); cur=conn.cursor()
-    cur.execute('SELECT id FROM users WHERE username=%s', (username,))
+    cur.execute('SELECT id FROM users WHERE email=%s', (email,))
     r=cur.fetchone()
     conn.close()
     return r[0] if r else None
@@ -195,9 +199,9 @@ def gw_stats_for_player(player_id, gw_round):
 
 def all_users():
     conn=db(); cur=conn.cursor()
-    cur.execute('SELECT id, username FROM users ORDER BY username ASC')
+    cur.execute('SELECT id, email, display_name FROM users ORDER BY display_name ASC')
     rows=cur.fetchall(); conn.close()
-    return [{'id':r[0],'username':r[1]} for r in rows]
+    return [{'id':r[0],'display_name':r[1]} for r in rows]
 
 def gw_stats_for_user(uid, gw_id):
     conn=db(); cur=conn.cursor()
@@ -259,7 +263,7 @@ def get_gw_lineup_for_users(events, data):
                     "points": 0,
                 }
         results.append({
-            "username": u['username'],
+            "username": u['display_name'],
             "lineup": lineup,
             "total": user_total
         })
@@ -371,14 +375,14 @@ def logout():
 
 @app.route('/welcome')
 def welcome():
-    if 'username' not in session:
-        return redirect(url_for('login'))
+    if 'user_id' not in session:
+        return redirect(url_for('new_login'))
     return render_template('welcome.html', title='Welcome')
 
 @app.route('/my_squad')
 def my_squad():
-    if 'username' not in session: return redirect(url_for('login'))
-    username=session['username']; uid=get_user_id(username)
+    if 'user_id' not in session: return redirect(url_for('new_login'))
+    uid=session['user_id']; email=session['email']
     data,teams,positions,events=bootstrap()
     locked, gw_id = get_locked_picks(uid, events)
     total_points=0; squad={'GK':None,'DEF':None,'MID':None,'FWD':None}
@@ -419,7 +423,7 @@ def my_squad():
     return render_template(
         'my_squad.html',
         title='GW Lineup',
-        username=username,
+        username=display_name,
         total_points=total_points,
         squad=squad,
         league_lineups=league_lineups,
@@ -428,8 +432,8 @@ def my_squad():
 
 @app.route('/squad')
 def squad():
-    if 'username' not in session: return redirect(url_for('login'))
-    username=session['username']; uid=get_user_id(username)
+    if 'user_id' not in session: return redirect(url_for('new_login'))
+    uid=session['user_id']; email=session['email']
     club=request.args.get('club'); position=request.args.get('position'); page=int(request.args.get('page',1))
     data,teams,positions,events=bootstrap()
     team_map={t['id']:t for t in data['teams']}
@@ -460,10 +464,10 @@ def squad():
 
 @app.route('/pick_player', methods=['POST'])
 def pick_player():
-    if 'username' not in session: return ('',401)
+    if 'user_id' not in session: return ('',401)
     data_json = request.get_json(force=True)
     position=data_json['position']; player_id=int(data_json['player_id'])
-    username=session['username']; uid=get_user_id(username)
+    uid=session['user_id']; email=session['email']
     data,teams,positions,events=bootstrap()
     player=next((p for p in data['elements'] if p['id']==player_id),None)
     if not player: return jsonify({'status':'error'}),400
@@ -490,9 +494,9 @@ def pick_player():
 
 @app.route('/remove_player', methods=['POST'])
 def remove_player():
-    if 'username' not in session: return ('',401)
+    if 'user_id' not in session: return ('',401)
     position=request.get_json(force=True)['position']
-    username=session['username']; uid=get_user_id(username)
+    uid=session['user_id']; email=session['email']
     data,teams,positions,events=bootstrap()
     pending, gw_next = get_pending_picks(uid, events)
     conn=db(); cur=conn.cursor()
@@ -502,8 +506,8 @@ def remove_player():
 
 @app.route('/clear_team', methods=['POST'])
 def clear_team():
-    if 'username' not in session: return ('',401)
-    username=session['username']; uid=get_user_id(username)
+    if 'user_id' not in session: return ('',401)
+    uid=session['user_id']; email=session['email']
     data,teams,positions,events=bootstrap()
     pending, gw_next = get_pending_picks(uid, events)
     conn=db(); cur=conn.cursor()
@@ -513,12 +517,12 @@ def clear_team():
 
 @app.route('/league', methods=['GET'])
 def league():
-    if 'username' not in session: return redirect(url_for('login'))
+    if 'user_id' not in session: return redirect(url_for('new_login'))
     data,teams,positions,events=bootstrap()
     users=all_users()
     conn=db(); cur=conn.cursor()
     cur.execute("""
-        SELECT u.username,
+        SELECT u.display_name,
                COALESCE(SUM(r.league_points),0) as total_lp,
                CASE WHEN COUNT(r.gw_points)>0
                     THEN AVG(CASE WHEN r.gw_points BETWEEN 0 AND 21 THEN r.gw_points ELSE 0 END)
@@ -526,9 +530,9 @@ def league():
         FROM users u
         LEFT JOIN results r ON r.user_id=u.id
         GROUP BY u.id
-        ORDER BY total_lp DESC, avg_gw DESC, u.username ASC
+        ORDER BY total_lp DESC, avg_gw DESC, u.display_name ASC
     """)
-    league_rows=[{'username':r[0],'total_lp':int(r[1]),'avg_gw':float(r[2])} for r in cur.fetchall()]
+    league_rows=[{'display_name':r[0],'total_lp':int(r[1]),'avg_gw':float(r[2])} for r in cur.fetchall()]
 
     sel_gw=request.args.get('gw',type=int)
     cur_ev = next((e for e in events if e.get('is_current')), None)
@@ -545,7 +549,7 @@ def league():
         else:
             gwp=gw_stats_for_user(u['id'], selected_gw); lp=league_points_from_total(gwp)
         display_points = f"{gwp}" if gwp<=21 else f"Bust ({gwp})"
-        history_rows.append({'username':u['username'],'gw_points':gwp,'display_points':display_points,'league_points':lp})
+        history_rows.append({'username':u['display_name'],'gw_points':gwp,'display_points':display_points,'league_points':lp})
     history_rows.sort(key=lambda r:(r['league_points'], r['gw_points']), reverse=True)
 
     fixtures = load_fpl_from_gist().get("fixtures", [])
@@ -565,7 +569,7 @@ def league():
 
 @app.route('/finalize_gw', methods=['POST'])
 def finalize_gw():
-    if 'username' not in session: return redirect(url_for('login'))
+    if 'user_id' not in session: return redirect(url_for('new_login'))
     data,teams,positions,events=bootstrap()
     sel_gw=request.args.get('gw',type=int) or request.form.get('gw',type=int)
     cur_ev=next((e for e in events if e.get('is_current')), None)
