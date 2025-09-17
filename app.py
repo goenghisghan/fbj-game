@@ -316,13 +316,6 @@ def new_register():
 
     return render_template("new_register.html", title="Register")
 
-        except Exception as e:
-            conn.rollback(); conn.close()
-            print("Registration error:", e)
-            flash("❌ That email is already registered.", "danger")
-
-    return render_template("new_register.html", title="Register")
-
 @app.route("/confirm/<token>")
 def confirm_email(token):
     conn = db(); cur = conn.cursor()
