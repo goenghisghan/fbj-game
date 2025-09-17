@@ -1,0 +1,85 @@
+{% extends "base.html" %}{% block content %}
+<div class="gw-banner">
+  GW{{ gw_id_all }}
+</div>
+<h2>Total points: {{ total_points }}</h2>
+<div class="scale-wrap">
+  <div class="scale">
+    {% for n in range(0,22) %}
+      <div class="seg {% if 17<=n<=20 %}yellow{% endif %} {% if n==21 %}green{% endif %}">{{ n }}</div>
+    {% endfor %}
+    <div class="seg bust {% if total_points<=21 %}faded{% endif %}">BUST</div>
+    {% set clamped = total_points if total_points<=22 else 22 %}
+    {% set percent = (100*(clamped+0.5)/23) %}
+    <div class="marker" style="left: {{ percent }}%"></div>
+  </div>
+</div>
+<div class="grid">
+{% for pos in ["GK","DEF","MID","FWD"] %}{% set p = squad[pos] %}
+<div class="card player-card">
+  <div class="player-pos">{{ pos }}</div>
+  {% if p %}
+    <img class="player-photo" src="{{ p.photo_url }}" alt="{{ p.name }}">
+    <div style="font-weight:700;margin-top:6px">{{ p.name }}</div>
+    <div class="meta">{{ p.team_name }}</div>
+    <div class="meta">GW Points: {{ p.gw_points }}</div>
+    {% if p.stats %}
+    <div class="stats">
+      <details>
+        <summary>More stats</summary>
+        <ul>
+          <li>Minutes: {{ p.stats.minutes }}</li>
+          {% if p.stats.position == 'GK' %}<li>Saves: {{ p.stats.saves }}</li>{% endif %}
+          <li>Goals conceded: {{ p.stats.goals_conceded }}</li>
+          <li>Defensive contributions: {{ p.stats.def_contrib }}</li>
+          <li>Assists: {{ p.stats.assists }}</li>
+          <li>Goals: {{ p.stats.goals_scored }}</li>
+          <li>Bonus: {{ p.stats.bonus }}</li>
+          {% if p.stats.yellow_cards and p.stats.yellow_cards>0 %}<li>Yellow cards: {{ p.stats.yellow_cards }}</li>{% endif %}
+          {% if p.stats.red_cards and p.stats.red_cards>0 %}<li>Red cards: {{ p.stats.red_cards }}</li>{% endif %}
+          {% if p.stats.penalties_missed and p.stats.penalties_missed>0 %}<li>Penalty missed: {{ p.stats.penalties_missed }}</li>{% endif %}
+          {% if p.stats.own_goals and p.stats.own_goals>0 %}<li>Own goals: {{ p.stats.own_goals }}</li>{% endif %}
+        </ul>
+      </details>
+    </div>
+    {% endif %}
+  {% else %}
+    <img class="player-photo" src="{{ url_for('static', filename='question.png') }}" alt="Empty">
+    <div class="meta">No player selected</div>
+  {% endif %}
+</div>
+{% endfor %}
+</div>
+<h3 style="margin-top:24px">League Picks</h3>
+<table class="table picks">
+  <thead>
+    <tr>
+      <th>User</th>
+      <th>GK</th>
+      <th>DEF</th>
+      <th>MID</th>
+      <th>FWD</th>
+      <th>Total</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for u in league_lineups %}
+    <tr>
+      <td>{{ u.username }}</td>
+      {% for pos in ["GK","DEF","MID","FWD"] %}
+      <td>
+        {% if u.lineup[pos].name %}
+          <img src="{{ u.lineup[pos].photo_url }}" alt="photo" style="width:24px;height:30px;vertical-align:middle;margin-right:4px">
+          {{ u.lineup[pos].name }} ({{ u.lineup[pos].points }})
+        {% else %}
+          <img src="{{ u.lineup[pos].photo_url }}" alt="?" style="width:24px;height:30px;vertical-align:middle;margin-right:4px">
+          None (0)
+        {% endif %}
+      </td>
+      {% endfor %}
+      <td><strong>{{ u.total }}</strong></td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}
