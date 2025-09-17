@@ -263,10 +263,7 @@ def get_gw_lineup_for_users(events, data):
 # ----------------- ROUTES -----------------
 @app.route('/')
 def root():
-    return redirect(url_for('login'))
-
-import uuid
-from werkzeug.security import generate_password_hash
+    return redirect(url_for('new_login'))
 
 @app.route("/new_register", methods=["GET", "POST"])
 def new_register():
@@ -361,7 +358,7 @@ def new_login():
 def logout():
     session.clear()
     flash('Logged out.', 'info')
-    return redirect(url_for('login'))
+    return redirect(url_for('new_login'))
 
 @app.route('/welcome')
 def welcome():
