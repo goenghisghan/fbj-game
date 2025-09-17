@@ -1,7 +1,6 @@
 import os, requests, json, time, uuid, smtplib
 import psycopg2, psycopg2.extras
 from datetime import datetime, timezone
-from email.mime.text import MIMEText
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -16,20 +15,26 @@ app.config.update(
 DATABASE_URL = os.environ.get("DATABASE_URL")  # Supabase Postgres connection string
 
 def send_email(to_email, subject, body):
-    smtp_server = os.environ.get("SMTP_PORT")  
-    smtp_port = os.environ.get("SMTP_PORT")  
-    smtp_user = os.environ.get("SMTP_USER")  
-    smtp_pass = os.environ.get("SMTP_PASS")
+    api_key = os.environ.get("BREVO_API_KEY")
+    url = "https://api.brevo.com/v3/smtp/email"
 
-    msg = MIMEText(body, "html")
-    msg["Subject"] = subject
-    msg["From"] = "FBJ Game <goe@fatzone.co.uk>"  # your verified sender
-    msg["To"] = to_email
+    payload = {
+        "sender": {"email": "goe@fatzone.co.uk", "name": "FBJ Game"},
+        "to": [{"email": to_email}],
+        "subject": subject,
+        "htmlContent": body
+    }
+    headers = {
+        "accept": "application/json",
+        "api-key": api_key,
+        "content-type": "application/json"
+    }
 
-    with smtplib.SMTP(smtp_server, smtp_port) as server:
-        server.starttls()
-        server.login(smtp_user, smtp_pass)
-        server.sendmail(msg["From"], [to_email], msg.as_string())
+    r = requests.post(url, json=payload, headers=headers, timeout=10)
+    if r.status_code >= 400:
+        print("❌ Email failed:", r.text)
+    else:
+        print("✅ Email sent:", r.json())
 
 
 # ----------------- GIST HANDLING -----------------
@@ -289,7 +294,7 @@ def new_register():
             conn.commit()
             conn.close()
 
-            # Send confirmation email
+            # Confirmation email
             confirm_link = url_for("confirm_email", token=token, _external=True)
             send_email(
                 email,
@@ -303,6 +308,13 @@ def new_register():
 
             flash("✅ Registration successful! Check your email to confirm your account.", "success")
             return redirect(url_for("new_login"))
+
+        except Exception as e:
+            conn.rollback(); conn.close()
+            print("Registration error:", e)
+            flash("❌ That email is already registered.", "danger")
+
+    return render_template("new_register.html", title="Register")
 
         except Exception as e:
             conn.rollback(); conn.close()
