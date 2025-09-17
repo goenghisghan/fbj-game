@@ -163,6 +163,13 @@ def get_user_id(email):
     conn.close()
     return r[0] if r else None
 
+def get_display_name(user_id):
+    conn=db(); cur=conn.cursor()
+    cur.execute('SELECT display_name FROM users WHERE id=%s', (user_id,))
+    r=cur.fetchone()
+    conn.close()
+    return r[0] if r else None
+
 def get_locked_picks(user_id, events):
     now = datetime.now(timezone.utc)
     cur_ev = next((e for e in events if e.get('is_current')), None)
@@ -384,6 +391,7 @@ def welcome():
 def my_squad():
     if 'user_id' not in session: return redirect(url_for('new_login'))
     uid=session['user_id']; email=session['email']
+    display_name = get_display_name(session['user_id'])
     data,teams,positions,events=bootstrap()
     locked, gw_id = get_locked_picks(uid, events)
     total_points=0; squad={'GK':None,'DEF':None,'MID':None,'FWD':None}
@@ -423,7 +431,7 @@ def my_squad():
     league_lineups, gw_id_all = get_gw_lineup_for_users(events, data)
     return render_template(
         'my_squad.html',
-        title='GW Lineup',
+        title='Live GW',
         username=display_name,
         total_points=total_points,
         squad=squad,
