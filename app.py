@@ -365,7 +365,7 @@ def new_login():
 @app.route('/reset_request')
 def reset_request():
     flash("Password reset not implemented yet.", "info")
-    return redirec(url_for('new_login'))
+    return redirect(url_for('new_login'))
 
 @app.route('/logout')
 def logout():
