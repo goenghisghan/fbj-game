@@ -1,8 +1,6 @@
 *{box-sizing:border-box}
 body{font-family:Arial,Helvetica,sans-serif;background:#f3f4f6;margin:0;color:#111827}
 a{color:#2563eb;text-decoration:none}a:hover{text-decoration:underline}
-.nav{background:#fff;border-bottom:1px solid #e5e7eb}.nav-inner{max-width:1100px;margin:0 auto;display:flex;gap:16px;align-items:center;justify-content:space-between;padding:8px 16px}
-.nav img{height:46px}.nav-links a{margin-right:18px;padding:6px 12px;border-radius:8px}.nav-links a:hover{background:#eef2ff}
 .container{max-width:1100px;margin:24px auto;padding:0 16px}.card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;box-shadow:0 2px 6px rgba(0,0,0,.04)}
 .center{display:flex;justify-content:center;align-items:center}.auth-wrap{min-height:80vh}.auth-card{width:360px; padding:24px}.auth-card h2{margin:0 0 12px 0}
 .input{width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;margin:8px 0}.btn{background:#2563eb;color:#fff;border:none;border-radius:8px;padding:10px 14px;cursor:pointer}
@@ -91,8 +89,14 @@ a{color:#2563eb;text-decoration:none}a:hover{text-decoration:underline}
   border-bottom: 1px solid #111;     /* subtle darker divider */
 }
 
-.nav img {
-  height: 50px;
+.nav-logos {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.nav-logos img {
+  height: 30px;
 }
 
 .nav-inner {
