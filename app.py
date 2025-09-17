@@ -280,10 +280,10 @@ def get_gw_lineup_for_users(events, data):
 # ----------------- ROUTES -----------------
 @app.route('/')
 def root():
-    return redirect(url_for('new_login'))
+    return redirect(url_for('login'))
 
-@app.route("/new_register", methods=["GET", "POST"])
-def new_register():
+@app.route("/register", methods=["GET", "POST"])
+def register():
     if request.method == "POST":
         first_name = request.form["first_name"].strip()
         last_name = request.form["last_name"].strip()
@@ -292,7 +292,7 @@ def new_register():
 
         if not (first_name and last_name and email and password):
             flash("⚠️ All fields are required.", "warning")
-            return render_template("new_register.html", title="Register")
+            return render_template("register.html", title="Register")
 
         hashed_pw = generate_password_hash(password)
         token = uuid.uuid4().hex
@@ -319,14 +319,14 @@ def new_register():
             )
 
             flash("✅ Registration successful! Check your email to confirm your account.", "success")
-            return redirect(url_for("new_login"))
+            return redirect(url_for("login"))
 
         except Exception as e:
             conn.rollback(); conn.close()
             print("Registration error:", e)
             flash("❌ That email is already registered.", "danger")
 
-    return render_template("new_register.html", title="Register")
+    return render_template("register.html", title="Register")
 
 @app.route("/confirm/<token>")
 def confirm_email(token):
@@ -342,10 +342,10 @@ def confirm_email(token):
         flash("⚠️ Invalid or expired confirmation link.", "danger")
 
     conn.close()
-    return redirect(url_for("new_login"))
+    return redirect(url_for("login"))
     
-@app.route("/new_login", methods=["GET", "POST"])
-def new_login():
+@app.route("/login", methods=["GET", "POST"])
+def login():
     if request.method == "POST":
         email = request.form["email"].strip()
         password = request.form["password"]
@@ -368,28 +368,28 @@ def new_login():
         else:
             flash("❌ No account found with that email.", "danger")
 
-    return render_template("new_login.html", title="Login")
+    return render_template("login.html", title="Login")
 
 @app.route('/reset_request')
 def reset_request():
     flash("Password reset not implemented yet.", "info")
-    return redirect(url_for('new_login'))
+    return redirect(url_for('login'))
 
 @app.route('/logout')
 def logout():
     session.clear()
     flash('Logged out.', 'info')
-    return redirect(url_for('new_login'))
+    return redirect(url_for('login'))
 
 @app.route('/welcome')
 def welcome():
     if 'user_id' not in session:
-        return redirect(url_for('new_login'))
+        return redirect(url_for('login'))
     return render_template('welcome.html', title='Welcome')
 
-@app.route('/my_squad')
-def my_squad():
-    if 'user_id' not in session: return redirect(url_for('new_login'))
+@app.route('/live')
+def live():
+    if 'user_id' not in session: return redirect(url_for('login'))
     uid=session['user_id']; email=session['email']
     display_name = get_display_name(session['user_id'])
     data,teams,positions,events=bootstrap()
@@ -430,7 +430,7 @@ def my_squad():
             }
     league_lineups, gw_id_all = get_gw_lineup_for_users(events, data)
     return render_template(
-        'my_squad.html',
+        'live.html',
         title='Live GW',
         username=display_name,
         total_points=total_points,
@@ -439,9 +439,9 @@ def my_squad():
         gw_id_all=gw_id_all
     )
 
-@app.route('/squad')
+@app.route('/picks')
 def squad():
-    if 'user_id' not in session: return redirect(url_for('new_login'))
+    if 'user_id' not in session: return redirect(url_for('login'))
     uid=session['user_id']; email=session['email']
     club=request.args.get('club'); position=request.args.get('position'); page=int(request.args.get('page',1))
     data,teams,positions,events=bootstrap()
@@ -469,7 +469,7 @@ def squad():
     class O(dict): __getattr__=dict.get
     subset=[O(p) for p in subset]
     clubs=sorted({team_map[p['team']]['name'] for p in data['elements']})
-    return render_template('squad.html',title='Pick Team',players=subset,selected=selected,selected_clubs=selected_clubs,clubs=clubs,current_page=page,total_pages=total_pages)
+    return render_template('picks.html',title='Pick Team',players=subset,selected=selected,selected_clubs=selected_clubs,clubs=clubs,current_page=page,total_pages=total_pages)
 
 @app.route('/pick_player', methods=['POST'])
 def pick_player():
@@ -526,7 +526,7 @@ def clear_team():
 
 @app.route('/league', methods=['GET'])
 def league():
-    if 'user_id' not in session: return redirect(url_for('new_login'))
+    if 'user_id' not in session: return redirect(url_for('login'))
     data,teams,positions,events=bootstrap()
     users=all_users()
     conn=db(); cur=conn.cursor()
@@ -578,7 +578,7 @@ def league():
 
 @app.route('/finalize_gw', methods=['POST'])
 def finalize_gw():
-    if 'user_id' not in session: return redirect(url_for('new_login'))
+    if 'user_id' not in session: return redirect(url_for('login'))
     data,teams,positions,events=bootstrap()
     sel_gw=request.args.get('gw',type=int) or request.form.get('gw',type=int)
     cur_ev=next((e for e in events if e.get('is_current')), None)
