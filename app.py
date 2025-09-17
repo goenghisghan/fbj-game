@@ -209,7 +209,7 @@ def all_users():
     conn=db(); cur=conn.cursor()
     cur.execute('SELECT id, email, display_name FROM users ORDER BY display_name ASC')
     rows=cur.fetchall(); conn.close()
-    return [{'id':r[0],'display_name':r[1], 'email':r[2]} for r in rows]
+    return [{'id':r[0],'email':r[1], 'display_name':r[2]} for r in rows]
 
 def gw_stats_for_user(uid, gw_id):
     conn=db(); cur=conn.cursor()
