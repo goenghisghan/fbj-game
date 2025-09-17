@@ -538,10 +538,10 @@ def league():
                     ELSE 0 END as avg_gw
         FROM users u
         LEFT JOIN results r ON r.user_id=u.id
-        GROUP BY u.id
+        GROUP BY u.id, u.display_name
         ORDER BY total_lp DESC, avg_gw DESC, u.display_name ASC
     """)
-    league_rows=[{'display_name':r[0],'total_lp':int(r[1]),'avg_gw':float(r[2])} for r in cur.fetchall()]
+    league_rows=[{'username':r[0],'total_lp':int(r[1]),'avg_gw':float(r[2])} for r in cur.fetchall()]
 
     sel_gw=request.args.get('gw',type=int)
     cur_ev = next((e for e in events if e.get('is_current')), None)
