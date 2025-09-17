@@ -288,7 +288,7 @@ def new_register():
         try:
             conn = db(); cur = conn.cursor()
             cur.execute("""
-                INSERT INTO new_users (email, first_name, last_name, password, confirmation_token)
+                INSERT INTO users (email, first_name, last_name, password, confirmation_token)
                 VALUES (%s, %s, %s, %s, %s)
             """, (email, first_name, last_name, hashed_pw, token))
             conn.commit()
@@ -319,11 +319,11 @@ def new_register():
 @app.route("/confirm/<token>")
 def confirm_email(token):
     conn = db(); cur = conn.cursor()
-    cur.execute("SELECT id FROM new_users WHERE confirmation_token=%s", (token,))
+    cur.execute("SELECT id FROM users WHERE confirmation_token=%s", (token,))
     user = cur.fetchone()
 
     if user:
-        cur.execute("UPDATE new_users SET is_confirmed=TRUE, confirmation_token=NULL WHERE id=%s", (user[0],))
+        cur.execute("UPDATE users SET is_confirmed=TRUE, confirmation_token=NULL WHERE id=%s", (user[0],))
         conn.commit()
         flash("✅ Email confirmed! You can now log in.", "success")
     else:
@@ -339,7 +339,7 @@ def new_login():
         password = request.form["password"]
 
         conn = db(); cur = conn.cursor()
-        cur.execute("SELECT id, password, is_confirmed FROM new_users WHERE email=%s", (email,))
+        cur.execute("SELECT id, password, is_confirmed FROM users WHERE email=%s", (email,))
         user = cur.fetchone()
         conn.close()
 
