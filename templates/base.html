@@ -22,18 +22,18 @@
       </div>
       <div class="nav-links">
         {% if session.get('user_id') %}
-          <a href="{{ url_for('squad') }}"
-             class="{% if request.endpoint == 'squad' %}active{% endif %}">Pick Team</a>
-          <a href="{{ url_for('my_squad') }}"
-             class="{% if request.endpoint == 'my_squad' %}active{% endif %}">Live GW</a>
+          <a href="{{ url_for('picks') }}"
+             class="{% if request.endpoint == 'picks' %}active{% endif %}">Pick Team</a>
+          <a href="{{ url_for('live') }}"
+             class="{% if request.endpoint == 'live' %}active{% endif %}">Live GW</a>
           <a href="{{ url_for('league') }}"
              class="{% if request.endpoint == 'league' %}active{% endif %}">League &amp; History</a>
           <a href="{{ url_for('logout') }}">Logout</a>
         {% else %}
-          <a href="{{ url_for('new_login') }}"
-             class="{% if request.endpoint == 'new_login' %}active{% endif %}">Login</a>
-          <a href="{{ url_for('new_register') }}"
-             class="{% if request.endpoint == 'new_register' %}active{% endif %}">Register</a>
+          <a href="{{ url_for('login') }}"
+             class="{% if request.endpoint == 'login' %}active{% endif %}">Login</a>
+          <a href="{{ url_for('register') }}"
+             class="{% if request.endpoint == 'register' %}active{% endif %}">Register</a>
         {% endif %}
       </div>
     </div>
