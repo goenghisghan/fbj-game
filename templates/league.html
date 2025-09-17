@@ -1,7 +1,7 @@
 {% extends "base.html" %}{% block content %}
 <h2>League Table</h2>
 <table class="table">
-  <thead><tr><th>Rank</th><th>User</th><th>Total League Pts</th><th>Avg GW Pts</th></tr></thead>
+  <thead><tr><th>Rank</th><th>Manager</th><th>Total League Pts</th><th>Avg GW Pts</th></tr></thead>
   <tbody>
   {% for row in league_rows %}
     <tr>
@@ -27,7 +27,7 @@
   {% endif %}
 </form>
 <table class="table">
-  <thead><tr><th>User</th><th>GW Points</th><th>League Points</th></tr></thead>
+  <thead><tr><th>Manager</th><th>GW Points</th><th>League Points</th></tr></thead>
   <tbody>
   {% for r in history_rows %}
     <tr>
