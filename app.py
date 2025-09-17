@@ -394,11 +394,11 @@ def live():
     display_name = get_display_name(session['user_id'])
     data,teams,positions,events=bootstrap()
     locked, gw_id = get_locked_picks(uid, events)
-    total_points=0; squad={'GK':None,'DEF':None,'MID':None,'FWD':None}
+    total_points=0; picks={'GK':None,'DEF':None,'MID':None,'FWD':None}
     if locked and gw_id:
         team_map={t['id']:t for t in data['teams']}
         player_map={p['id']:p for p in data['elements']}
-        for pos in squad.keys():
+        for pos in picks.keys():
             pid = locked.get(pos)
             if not pid: continue
             p = player_map.get(pid)
@@ -408,7 +408,7 @@ def live():
             hist=gw_stats_for_player(pid, gw_id)
             gw_pts=hist.get('total_points',0) if hist else 0
             total_points+=gw_pts
-            squad[pos]={
+            picks[pos]={
                 'name':f"{p.get('first_name','')} {p.get('second_name','')}".strip(),
                 'team_name':teams[p['team']]['name'],
                 'photo_url':photo_url,
@@ -434,13 +434,13 @@ def live():
         title='Live GW',
         username=display_name,
         total_points=total_points,
-        squad=squad,
+        squad=picks,
         league_lineups=league_lineups,
         gw_id_all=gw_id_all
     )
 
 @app.route('/picks')
-def squad():
+def picks():
     if 'user_id' not in session: return redirect(url_for('login'))
     uid=session['user_id']; email=session['email']
     club=request.args.get('club'); position=request.args.get('position'); page=int(request.args.get('page',1))
