@@ -513,6 +513,7 @@ def live():
                 'name': f"{p.get('first_name','')} {p.get('second_name','')}".strip(),
                 'team_name': teams[p['team']]['name'],
                 'photo_url': photo_url,
+                'base_points' : base_pts,
                 'gw_points': gw_pts,
                 'penalty': penalty,
                 'pick_count': count,
