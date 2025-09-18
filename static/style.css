@@ -332,3 +332,26 @@ a{color:#2563eb;text-decoration:none}a:hover{text-decoration:underline}
   line-height: 1.4;
 }
 
+.penalty-circle {
+  display: inline-block;
+  background: #e53935;   /* red */
+  color: #fff;
+  font-size: 0.75em;
+  font-weight: bold;
+  border-radius: 50%;
+  padding: 4px 6px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+.penalty-circle-small {
+  display: inline-block;
+  background: #e53935;   /* red */
+  color: #fff;
+  font-size: 0.45em;
+  font-weight: bold;
+  border-radius: 50%;
+  padding: 2px 5px;
+  margin-left: 4px;
+  vertical-align: middle;
+}
