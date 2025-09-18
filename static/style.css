@@ -10,11 +10,11 @@ a{color:#2563eb;text-decoration:none}a:hover{text-decoration:underline}
 .meta{font-size:14px;color:#4b5563;margin-top:6px}.table{width:100%;border-collapse:collapse}.table th,.table td{padding:8px;border-bottom:1px solid #e5e7eb;text-align:left}.table th{background:#f9fafb}
 .pagination{margin-top:10px}
 .subtitle {
-  font-size: 1.2em;
+  font-size: 0.4em;
   margin-top: -5px;
-  margin-bottom: 15px;
+  margin-bottom: -5px;
   color: #555;
-  font-weight: 300;
+  font-weight: 100;
   text-align: center;
 }
 
