@@ -25,7 +25,9 @@
     <div class="meta">
       GW Points: {{ p.base_points }}
       {% if p.penalty and p.penalty > 0 %}
-          <span class="penalty-circle">-{{ p.penalty }}</span>
+          <span class="penalty-circle"
+            title="Picked by {{ p.pick_count }} managers. Rule: {{ p.rule_text }}">
+            -{{ p.penalty }}</span>
       {% endif %}
     </div>
     {% if p.stats %}
