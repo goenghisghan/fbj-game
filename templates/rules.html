@@ -3,7 +3,7 @@
 {% block content %}
 <div class="rules-container">
   <h1>📜 FBJ Full Rules</h1>
-  <p class="intro">Here’s everything you need to know to master the Fantasy Football Blackjack Game.</p>
+  <p class="intro">Here’s everything you need to know about the Fantasy Football Blackjack Game.</p>
 
   <div class="rule-section card">
     <h2>1. Picking Your Team</h2>
@@ -16,7 +16,7 @@
         <li>1 Forward (FWD)</li>
       </ul>
       <li>You cannot select more than <strong>one player from the same club</strong>.</li>
-      <li>You can update your picks anytime before the official FPL deadline.</li>
+      <li>You can update your picks anytime before the official FPL gameweek deadline.</li>
     </ul>
   </div>
 
@@ -31,19 +31,19 @@
 
   <div class="rule-section card">
     <h2>3. Scoring & Duplicate Penalties</h2>
-    <p>Players earn points based on the official FPL system, but FBJ adds its own twist:</p>
+    <p>Players earn points based on the official FPL system (including bonus and defensive contribution points), but FBJ adds its own twist:</p>
     <p><strong>Duplicate Player Penalties:</strong></p>
     <ul>
       <li>If more than one manager picks the same player, that player starts with a penalty applied to all managers who own them.</li>
-      <li>The penalty depends on <strong>league size</strong>:</li>
+      <li>The penalty depends on <strong>league size</strong> (defined as the number of active players in a gameweek):</li>
     </ul>
     <table class="penalty-table">
       <tr><th>League Size</th><th>Penalty Rule</th></tr>
-      <tr><td>1–6 managers</td><td><code>2n – 2</code></td></tr>
-      <tr><td>7–12 managers</td><td><code>n – 1</code></td></tr>
-      <tr><td>13+ managers</td><td><code>ceil(0.5n – 0.5)</code></td></tr>
+      <tr><td>1–6 managers</td><td><code>-2pts for every additional manager that picks a player</code></td></tr>
+      <tr><td>7–12 managers</td><td><code>-1pts for every additional pick</code></td></tr>
+      <tr><td>13+ managers</td><td><code>-0.5pts for every additional pick (rounded up to nearest integer) </code></td></tr>
     </table>
-    <p>✅ Unique picks (n = 1) are never penalized.</p>
+    <p>✅ Unique picks are never penalised.</p>
   </div>
 
   <div class="rule-section card">
