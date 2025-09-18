@@ -387,6 +387,10 @@ def welcome():
         return redirect(url_for('login'))
     return render_template('welcome.html', title='Welcome')
 
+@app.route("/rules")
+def rules():
+    return render_template("rules.html", title="Game Rules")
+
 @app.route('/live')
 def live():
     if 'user_id' not in session: return redirect(url_for('login'))
