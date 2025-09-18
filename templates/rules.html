@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="rules-container">
+  <h1>📜 FBJ Full Rules</h1>
+  <p class="intro">Here’s everything you need to know to master the Fantasy Football Blackjack Game.</p>
+
+  <div class="rule-section card">
+    <h2>1. Picking Your Team</h2>
+    <ul>
+      <li>Each manager selects <strong>4 players</strong> every gameweek:</li>
+      <ul>
+        <li>1 Goalkeeper (GK)</li>
+        <li>1 Defender (DEF)</li>
+        <li>1 Midfielder (MID)</li>
+        <li>1 Forward (FWD)</li>
+      </ul>
+      <li>You cannot select more than <strong>one player from the same club</strong>.</li>
+      <li>You can update your picks anytime before the official FPL deadline.</li>
+    </ul>
+  </div>
+
+  <div class="rule-section card">
+    <h2>2. Blackjack 🎲</h2>
+    <p>The aim of the game is to score <strong>exactly 21 points</strong> in a gameweek.</p>
+    <ul>
+      <li>If your total goes <strong>over 21</strong>, you <strong>bust</strong> and your score is reduced to 0.</li>
+      <li>Play it safe or take risks — it’s all about hitting 21!</li>
+    </ul>
+  </div>
+
+  <div class="rule-section card">
+    <h2>3. Scoring & Duplicate Penalties</h2>
+    <p>Players earn points based on the official FPL system, but FBJ adds its own twist:</p>
+    <p><strong>Duplicate Player Penalties:</strong></p>
+    <ul>
+      <li>If more than one manager picks the same player, that player starts with a penalty applied to all managers who own them.</li>
+      <li>The penalty depends on <strong>league size</strong>:</li>
+    </ul>
+    <table class="penalty-table">
+      <tr><th>League Size</th><th>Penalty Rule</th></tr>
+      <tr><td>1–6 managers</td><td><code>2n – 2</code></td></tr>
+      <tr><td>7–12 managers</td><td><code>n – 1</code></td></tr>
+      <tr><td>13+ managers</td><td><code>ceil(0.5n – 0.5)</code></td></tr>
+    </table>
+    <p>✅ Unique picks (n = 1) are never penalized.</p>
+  </div>
+
+  <div class="rule-section card">
+    <h2>4. League Points</h2>
+    <p>After applying Blackjack and penalties, you earn League Points (LP) based on your total:</p>
+    <table class="lp-table">
+      <tr><th>Final Score</th><th>League Points</th></tr>
+      <tr><td>21</td><td>10 LP</td></tr>
+      <tr><td>20</td><td>4 LP</td></tr>
+      <tr><td>19</td><td>3 LP</td></tr>
+      <tr><td>18</td><td>2 LP</td></tr>
+      <tr><td>17</td><td>1 LP</td></tr>
+      <tr><td>16 or fewer</td><td>0 LP</td></tr>
+      <tr><td>Bust (over 21)</td><td>0 LP</td></tr>
+    </table>
+  </div>
+
+  <div class="rule-section card">
+    <h2>5. Season Format</h2>
+    <ul>
+      <li>Gameweeks follow the official FPL schedule.</li>
+      <li>League standings are based on the total of <strong>League Points</strong> across the season.</li>
+      <li>Tie-breakers:</li>
+      <ol>
+        <li>Highest average weekly score</li>
+        <li>Fewest busts</li>
+        <li>Coin toss ⚡</li>
+      </ol>
+    </ul>
+  </div>
+
+  <p class="back-link"><a href="{{ url_for('welcome') }}">⬅ Back to homepage</a></p>
+</div>
+{% endblock %}
