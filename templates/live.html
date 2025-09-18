@@ -22,7 +22,12 @@
     <img class="player-photo" src="{{ p.photo_url }}" alt="{{ p.name }}">
     <div style="font-weight:700;margin-top:6px">{{ p.name }}</div>
     <div class="meta">{{ p.team_name }}</div>
-    <div class="meta">GW Points: {{ p.gw_points }}</div>
+    <div class="meta">
+      GW Points: {{ p.base_points }}
+      {% if p.penalty and p.penalty > 0 %}
+          <span class="penalty-circle">-{{ p.penalty }}</span>
+      {% endif %}
+    </div>
     {% if p.stats %}
     <div class="stats">
       <details>
@@ -71,6 +76,9 @@
         {% if u.lineup[pos].name %}
           <img src="{{ u.lineup[pos].photo_url }}" alt="photo" style="width:24px;height:30px;vertical-align:middle;margin-right:4px">
           {{ u.lineup[pos].name }} ({{ u.lineup[pos].points }})
+          {% if u.lineup[pos].penalty and u.lineup[pos].penalty > 0 %}
+             <span class="penalty-circle-small">-{{ u.lineup[pos].penalty }}</span>
+          {% endif %}
         {% else %}
           <img src="{{ u.lineup[pos].photo_url }}" alt="?" style="width:24px;height:30px;vertical-align:middle;margin-right:4px">
           None (0)
