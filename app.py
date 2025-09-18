@@ -227,6 +227,22 @@ def calc_penalty(n, total_users):
     else:  # 13+
         return math.ceil(0.5 * n - 0.5)
 
+def get_player_pick_counts(gw_id):
+    """
+    Returns a dict mapping player_id -> number of managers
+    who picked that player in the given gameweek.
+    """
+    conn = db(); cur = conn.cursor()
+    cur.execute("""
+        SELECT player_id, COUNT(*) 
+        FROM picks 
+        WHERE gameweek_id = %s
+        GROUP BY player_id
+    """, (gw_id,))
+    rows = cur.fetchall()
+    conn.close()
+    return {player_id: count for player_id, count in rows}
+
 def get_valid_user_count(gw_id):
     conn = db(); cur = conn.cursor()
     cur.execute("""
