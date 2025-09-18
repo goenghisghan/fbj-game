@@ -1,4 +1,4 @@
-import os, requests, json, time, uuid, smtplib
+import os, requests, json, time, uuid, smtplib, math
 import psycopg2, psycopg2.extras
 from datetime import datetime, timezone
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
@@ -211,18 +211,69 @@ def all_users():
     rows=cur.fetchall(); conn.close()
     return [{'id':r[0],'email':r[1], 'display_name':r[2]} for r in rows]
 
+def calc_penalty(n, total_users):
+    """
+    n = number of managers who picked this player
+    total_users = number of managers with valid picks this GW
+    Returns penalty per manager (0 if unique pick).
+    """
+    if n <= 1:
+        return 0
+
+    if 1 <= total_users <= 6:
+        return 2 * n - 2
+    elif 7 <= total_users <= 12:
+        return n - 1
+    else:  # 13+
+        return math.ceil(0.5 * n - 0.5)
+
+def get_valid_user_count(gw_id):
+    conn = db(); cur = conn.cursor()
+    cur.execute("""
+        SELECT COUNT(DISTINCT user_id)
+        FROM picks
+        WHERE gameweek_id = %s
+    """, (gw_id,))
+    count = cur.fetchone()[0] or 0
+    conn.close()
+    return count
+
+total_users = get_valid_user_count(gw_id)
+
+def league_penalty_rule(total_users):
+    if 1 <= total_users <= 6:
+        return "Small league (1–6 users): penalty = -2 per player"
+    elif 7 <= total_users <= 12:
+        return "Medium league (7–12 users): penalty = -1 per player"
+    else:
+        return "Large league (13+ users): penalty = -0.5 per player (rounded up)"
+
+rule_text = league_penalty_rule(total_users)
+
 def gw_stats_for_user(uid, gw_id):
-    conn=db(); cur=conn.cursor()
+    conn = db(); cur = conn.cursor()
     cur.execute(
         'SELECT position, player_id FROM picks WHERE user_id=%s AND gameweek_id=%s',
         (uid, gw_id)
     )
-    rows=cur.fetchall(); conn.close()
-    if not rows: return 0
-    total=0
+    rows = cur.fetchall()
+    conn.close()
+    if not rows:
+        return 0
+
+    pick_counts = get_player_pick_counts(gw_id)
+    total_users = get_valid_user_count(gw_id)
+
+    total = 0
     for _, pid in rows:
-        hist=gw_stats_for_player(pid, gw_id)
-        total += hist.get('total_points',0) if hist else 0
+        hist = gw_stats_for_player(pid, gw_id)
+        pts = hist.get('total_points', 0) if hist else 0
+
+        count = pick_counts.get(pid, 1)
+        penalty = calc_penalty(count, total_users)
+        pts -= penalty
+
+        total += pts
     return total
 
 def get_gw_lineup_for_users(events, data):
@@ -234,6 +285,10 @@ def get_gw_lineup_for_users(events, data):
     team_map = {t['id']: t for t in data['teams']}
     player_map = {p['id']: p for p in data['elements']}
     users = all_users()
+
+    pick_counts = get_player_pick_counts(gw_id)
+    total_users = get_valid_user_count(gw_id)
+    rule_text = league_penalty_rule(total_users)
 
     results = []
     for u in users:
@@ -257,25 +312,38 @@ def get_gw_lineup_for_users(events, data):
                 photo_id = p.get('photo', '').split('.')[0] if p.get('photo') else "placeholder"
                 photo_url = f'https://resources.premierleague.com/premierleague/photos/players/40x40/p{photo_id}.png'
                 hist = gw_stats_for_player(pid, gw_id) or {}
-                pts = hist.get('total_points', 0)
+                base_pts = hist.get('total_points', 0)
+
+                count = pick_counts.get(pid, 1)
+                penalty = calc_penalty(count, total_users)
+                pts = base_pts - penalty
+
                 user_total += pts
                 lineup[pos] = {
                     "name": f"{p.get('first_name','')} {p.get('second_name','')}".strip(),
                     "photo_url": photo_url,
                     "points": pts,
+                    "penalty": penalty,
+                    "pick_count": count,
+                    "rule_text": rule_text
                 }
             else:
                 lineup[pos] = {
                     "name": None,
                     "photo_url": url_for('static', filename='question.png'),
                     "points": 0,
+                    "penalty": 0,
+                    "pick_count": 0,
+                    "rule_text": rule_text
                 }
+
         results.append({
             "username": u['display_name'],
             "lineup": lineup,
             "total": user_total
         })
     return results, gw_id
+
 
 # ----------------- ROUTES -----------------
 @app.route('/')
@@ -393,46 +461,68 @@ def rules():
 
 @app.route('/live')
 def live():
-    if 'user_id' not in session: return redirect(url_for('login'))
-    uid=session['user_id']; email=session['email']
-    display_name = get_display_name(session['user_id'])
-    data,teams,positions,events=bootstrap()
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    uid = session['user_id']
+    display_name = get_display_name(uid)
+
+    data, teams, positions, events = bootstrap()
     locked, gw_id = get_locked_picks(uid, events)
-    total_points=0; picks={'GK':None,'DEF':None,'MID':None,'FWD':None}
+
+    total_points = 0
+    picks = {'GK': None, 'DEF': None, 'MID': None, 'FWD': None}
+
     if locked and gw_id:
-        team_map={t['id']:t for t in data['teams']}
-        player_map={p['id']:p for p in data['elements']}
+        team_map = {t['id']: t for t in data['teams']}
+        player_map = {p['id']: p for p in data['elements']}
+        pick_counts = get_player_pick_counts(gw_id)
+        total_users = get_valid_user_count(gw_id)
+        rule_text = league_penalty_rule(total_users)
+
         for pos in picks.keys():
             pid = locked.get(pos)
-            if not pid: continue
+            if not pid:
+                continue
             p = player_map.get(pid)
-            if not p: continue
-            photo_id=p.get('photo','').split('.')[0]
-            photo_url=f'https://resources.premierleague.com/premierleague/photos/players/110x140/p{photo_id}.png'
-            hist=gw_stats_for_player(pid, gw_id)
-            gw_pts=hist.get('total_points',0) if hist else 0
-            total_points+=gw_pts
-            picks[pos]={
-                'name':f"{p.get('first_name','')} {p.get('second_name','')}".strip(),
-                'team_name':teams[p['team']]['name'],
-                'photo_url':photo_url,
-                'gw_points':gw_pts,
+            if not p:
+                continue
+
+            photo_id = p.get('photo', '').split('.')[0]
+            photo_url = f'https://resources.premierleague.com/premierleague/photos/players/110x140/p{photo_id}.png'
+            hist = gw_stats_for_player(pid, gw_id) or {}
+            base_pts = hist.get('total_points', 0)
+
+            count = pick_counts.get(pid, 1)
+            penalty = calc_penalty(count, total_users)
+            gw_pts = base_pts - penalty
+
+            total_points += gw_pts
+            picks[pos] = {
+                'name': f"{p.get('first_name','')} {p.get('second_name','')}".strip(),
+                'team_name': teams[p['team']]['name'],
+                'photo_url': photo_url,
+                'gw_points': gw_pts,
+                'penalty': penalty,
+                'pick_count': count,
+                'rule_text': rule_text,
                 'stats': ({
-                    'position':positions[p['element_type']],
-                    'minutes':hist.get('minutes',0),
-                    'saves':hist.get('saves',0),
-                    'goals_conceded':hist.get('goals_conceded',0),
-                    'assists':hist.get('assists',0),
-                    'goals_scored':hist.get('goals_scored',0),
-                    'bonus':hist.get('bonus',0),
-                    'def_contrib':hist.get('defensive_contribution',0),
-                    'yellow_cards':hist.get('yellow_cards',0),
-                    'red_cards':hist.get('red_cards',0),
-                    'penalties_missed':hist.get('penalties_missed',0),
-                    'own_goals':hist.get('own_goals',0),
+                    'position': positions[p['element_type']],
+                    'minutes': hist.get('minutes', 0),
+                    'saves': hist.get('saves', 0),
+                    'goals_conceded': hist.get('goals_conceded', 0),
+                    'assists': hist.get('assists', 0),
+                    'goals_scored': hist.get('goals_scored', 0),
+                    'bonus': hist.get('bonus', 0),
+                    'def_contrib': hist.get('defensive_contribution', 0),
+                    'yellow_cards': hist.get('yellow_cards', 0),
+                    'red_cards': hist.get('red_cards', 0),
+                    'penalties_missed': hist.get('penalties_missed', 0),
+                    'own_goals': hist.get('own_goals', 0),
                 } if hist else None)
             }
+
     league_lineups, gw_id_all = get_gw_lineup_for_users(events, data)
+
     return render_template(
         'live.html',
         title='Live GW',
