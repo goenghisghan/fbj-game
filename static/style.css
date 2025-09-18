@@ -219,3 +219,64 @@ a{color:#2563eb;text-decoration:none}a:hover{text-decoration:underline}
   border-radius: 8px;
   margin-bottom: 16px;
 }
+
+.rules-container {
+  max-width: 900px;
+  margin: 40px auto;
+  padding: 20px;
+}
+
+.rules-container h1 {
+  text-align: center;
+  font-size: 2.2em;
+  margin-bottom: 10px;
+  color: #d32f2f;
+}
+
+.rules-container .intro {
+  text-align: center;
+  font-size: 1.1em;
+  margin-bottom: 30px;
+  color: #555;
+}
+
+.rule-section {
+  margin-bottom: 25px;
+}
+
+.rule-section h2 {
+  margin-top: 0;
+  color: #2563eb;
+}
+
+.penalty-table, .lp-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 15px 0;
+}
+
+.penalty-table th, .penalty-table td,
+.lp-table th, .lp-table td {
+  border: 1px solid #ddd;
+  padding: 8px;
+  text-align: center;
+}
+
+.penalty-table th, .lp-table th {
+  background: #f5f5f5;
+}
+
+.back-link {
+  text-align: center;
+  margin-top: 20px;
+}
+
+.back-link a {
+  font-weight: bold;
+  color: #2563eb;
+  text-decoration: none;
+}
+
+.back-link a:hover {
+  text-decoration: underline;
+}
