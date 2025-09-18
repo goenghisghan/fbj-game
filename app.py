@@ -238,8 +238,6 @@ def get_valid_user_count(gw_id):
     conn.close()
     return count
 
-total_users = get_valid_user_count(gw_id)
-
 def league_penalty_rule(total_users):
     if 1 <= total_users <= 6:
         return "Small league (1–6 users): penalty = -2 per player"
@@ -247,8 +245,6 @@ def league_penalty_rule(total_users):
         return "Medium league (7–12 users): penalty = -1 per player"
     else:
         return "Large league (13+ users): penalty = -0.5 per player (rounded up)"
-
-rule_text = league_penalty_rule(total_users)
 
 def gw_stats_for_user(uid, gw_id):
     conn = db(); cur = conn.cursor()
