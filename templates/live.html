@@ -70,26 +70,38 @@
     </tr>
   </thead>
   <tbody>
-    {% for u in league_lineups %}
-    <tr>
-      <td>{{ u.username }}</td>
-      {% for pos in ["GK","DEF","MID","FWD"] %}
-      <td>
+  {% for u in league_lineups %}
+  <tr>
+    <td>{{ u.username }}</td>
+    {% for pos in ["GK","DEF","MID","FWD"] %}
+    <td>
+      <div class="cell-content">
         {% if u.lineup[pos].name %}
-          <img src="{{ u.lineup[pos].photo_url }}" alt="photo" style="width:24px;height:30px;vertical-align:middle;margin-right:4px">
-          {{ u.lineup[pos].name }} ({{ u.lineup[pos].points }})
+          <div>
+            <img src="{{ u.lineup[pos].photo_url }}" alt="photo"
+                 style="width:40px;height:40px;object-fit:cover;border-radius:50%">
+          </div>
+          <div class="player-name">{{ u.lineup[pos].name }}</div>
+          <div class="player-points">{{ u.lineup[pos].base_points }}</div>
           {% if u.lineup[pos].penalty and u.lineup[pos].penalty > 0 %}
-             <span class="penalty-circle-small">-{{ u.lineup[pos].penalty }}</span>
+            <div>
+              <span class="penalty-circle-small">-{{ u.lineup[pos].penalty }}</span>
+            </div>
           {% endif %}
         {% else %}
-          <img src="{{ u.lineup[pos].photo_url }}" alt="?" style="width:24px;height:30px;vertical-align:middle;margin-right:4px">
-          None (0)
+          <div>
+            <img src="{{ u.lineup[pos].photo_url }}" alt="?" 
+                 style="width:40px;height:40px;object-fit:cover;border-radius:50%">
+          </div>
+          <div class="player-name">None</div>
+          <div class="player-points">0</div>
         {% endif %}
-      </td>
-      {% endfor %}
-      <td><strong>{{ u.total }}</strong></td>
-    </tr>
+      </div>
+    </td>
     {% endfor %}
-  </tbody>
+    <td><strong>{{ u.total }}</strong></td>
+  </tr>
+  {% endfor %}
+</tbody>
 </table>
 {% endblock %}
