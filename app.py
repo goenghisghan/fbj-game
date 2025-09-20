@@ -134,16 +134,23 @@ def league_points_from_total(total):
     if total == 17: return 1
     return 0
 
-def next_opponents_by_team(teams):
+def next_opponents_by_team(teams, events):
     data = load_fpl_from_gist()
     fixtures = data.get("fixtures", [])
+
+    # find the next GW id
+    nxt = next((e for e in events if e.get('is_next')), None)
+    if not nxt:
+        return {}
+    gw_id = nxt['id']
+
     choice = {}
     for f in fixtures:
-        if f.get('finished') or f.get('finished_provisional'):
+        if f.get("event") != gw_id:  # only look at fixtures in the next GW
             continue
         h,a = f['team_h'], f['team_a']
-        if h not in choice: choice[h] = teams[a]['short_name']+' (H)'
-        if a not in choice: choice[a] = teams[h]['short_name']+' (A)'
+        choice[h] = teams[a]['short_name']+' (H)'
+        choice[a] = teams[h]['short_name']+' (A)'
     return choice
 
 def decorate_players(players,teams,positions,opp_map):
@@ -553,7 +560,7 @@ def picks():
     club=request.args.get('club'); position=request.args.get('position'); page=int(request.args.get('page',1))
     data,teams,positions,events=bootstrap()
     team_map={t['id']:t for t in data['teams']}
-    opp_map=next_opponents_by_team(team_map)
+    opp_map=next_opponents_by_team(team_map, events)
     players=decorate_players(data['elements'],team_map,positions,opp_map)
     players.sort(key=lambda x:x.get('total_points',0), reverse=True)
     if club: players=[p for p in players if p['team_name']==club]
