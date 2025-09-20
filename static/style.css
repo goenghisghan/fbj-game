@@ -344,18 +344,6 @@ a{color:#2563eb;text-decoration:none}a:hover{text-decoration:underline}
   vertical-align: middle;
 }
 
-.penalty-circle-small {
-  display: inline-block;
-  background: #e53935;   /* red */
-  color: #fff;
-  font-size: 0.45em;
-  font-weight: bold;
-  border-radius: 50%;
-  padding: 2px 5px;
-  margin-left: 4px;
-  vertical-align: middle;
-}
-
 .cell-content {
   display: flex;
   flex-direction: column;
@@ -373,7 +361,7 @@ a{color:#2563eb;text-decoration:none}a:hover{text-decoration:underline}
   margin-top: 2px;
 }
 
-.penalty-circle-small-alt {
+.penalty-circle-small {
   display: inline-block;
   background: red;
   color: white;
