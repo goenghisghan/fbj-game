@@ -328,8 +328,12 @@ def get_gw_lineup_for_users(events, data):
             pid = picks.get(pos)
             if pid and pid in player_map:
                 p = player_map[pid]
-                photo_id = p.get('photo', '').split('.')[0] if p.get('photo') else "placeholder"
-                photo_url = f'https://resources.premierleague.com/premierleague/photos/players/40x40/p{photo_id}.png'
+                if p.get('photo'):
+                  photo_id = p.get('photo', '').split('.')[0]
+                  photo_url = f'https://resources.premierleague.com/premierleague/photos/players/40x40/p{photo_id}.png'
+                else:
+                  photo_url = url_for('static', filename='question.png')
+                    
                 hist = gw_stats_for_player(pid, gw_id) or {}
                 base_pts = hist.get('total_points', 0)
 
@@ -341,6 +345,7 @@ def get_gw_lineup_for_users(events, data):
                 lineup[pos] = {
                     "name": p.get("web_name", "").strip(),
                     "photo_url": photo_url,
+                    "base_points": base_pts,
                     "points": pts,
                     "penalty": penalty,
                     "pick_count": count,
@@ -350,6 +355,7 @@ def get_gw_lineup_for_users(events, data):
                 lineup[pos] = {
                     "name": None,
                     "photo_url": url_for('static', filename='question.png'),
+                    "base_points": 0,
                     "points": 0,
                     "penalty": 0,
                     "pick_count": 0,
