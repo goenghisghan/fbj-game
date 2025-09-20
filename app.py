@@ -339,7 +339,7 @@ def get_gw_lineup_for_users(events, data):
 
                 user_total += pts
                 lineup[pos] = {
-                    "name": f"{p.get('first_name','')} {p.get('second_name','')}".strip(),
+                    "name": p.get("web_name", "").strip(),
                     "photo_url": photo_url,
                     "points": pts,
                     "penalty": penalty,
