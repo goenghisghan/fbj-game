@@ -352,8 +352,11 @@ a{color:#2563eb;text-decoration:none}a:hover{text-decoration:underline}
 }
 
 .player-name {
-  font-size: 0.8rem;
+  font-size: 0.6rem;
   margin-top: 4px;
+  max-width: 80px;
+  white-space: nowrap;
+  overflow: hidden;
 }
 
 .player-points {
