@@ -374,3 +374,15 @@ a{color:#2563eb;text-decoration:none}a:hover{text-decoration:underline}
   margin-top: 4px;
 }
 
+.penalty-circle-small {
+  display: inline-block;
+  background: green;
+  color: white;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  font-size: 0.7rem;
+  line-height: 20px;
+  text-align: center;
+  margin-top: 4px;
+}
