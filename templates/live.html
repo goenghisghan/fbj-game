@@ -87,6 +87,10 @@
             <div>
               <span class="penalty-circle-small">-{{ u.lineup[pos].penalty }}</span>
             </div>
+          {% else %}
+            <div>
+              <span class="no-penalty-circle-small">0</span>
+            </div>
           {% endif %}
         {% else %}
           <div>
