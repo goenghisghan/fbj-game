@@ -374,7 +374,7 @@ a{color:#2563eb;text-decoration:none}a:hover{text-decoration:underline}
   margin-top: 4px;
 }
 
-.penalty-circle-small {
+.no-penalty-circle-small {
   display: inline-block;
   background: green;
   color: white;
