@@ -53,6 +53,7 @@ a{color:#2563eb;text-decoration:none}a:hover{text-decoration:underline}
 }
 .scale .seg.bust {
   background: #fca5a5;
+  font-size: 0.25rem;
   font-weight: 700;
   color: #991b1b;
 }
