@@ -153,14 +153,18 @@ def next_opponents_by_team(teams, events):
         choice[a] = teams[h]['short_name']+' (A)'
     return choice
 
-def decorate_players(players,teams,positions,opp_map):
-    out=[]
+def decorate_players(players, teams, positions, opp_map):
+    badge_template = load_fpl_from_gist().get("badge_template")  # use FPL template
+
+    out = []
     for p in players:
-        d=dict(p)
-        d['team_name']=teams[p['team']]['name']
-        d['position_name']=positions[p['element_type']]
-        d['next_opp']=opp_map.get(p['team'],'-')
+        d = dict(p)
+        d['team_name'] = teams[p['team']]['name']
+        d['position_name'] = positions[p['element_type']]
+        d['next_opp'] = opp_map.get(p['team'], '-')
+        d['kit_url'] = badge_template.format(teams[p['team']]['code'])  # add badge
         out.append(d)
+
     return out
 
 def get_user_id(email):
