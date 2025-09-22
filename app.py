@@ -154,7 +154,7 @@ def next_opponents_by_team(teams, events):
     return choice
 
 def decorate_players(players, teams, positions, opp_map):
-    badge_template = load_fpl_from_gist().get("badge_template")  # use FPL template
+    badge_template = load_fpl_from_gist().get("badge_template")
 
     out = []
     for p in players:
@@ -162,7 +162,28 @@ def decorate_players(players, teams, positions, opp_map):
         d['team_name'] = teams[p['team']]['name']
         d['position_name'] = positions[p['element_type']]
         d['next_opp'] = opp_map.get(p['team'], '-')
-        d['kit_url'] = badge_template.format(teams[p['team']]['code'])  # add badge
+        d['kit_url'] = badge_template.format(teams[p['team']]['code'])
+
+        # 🔹 extra stats (come directly from bootstrap player data)
+        d['minutes'] = p.get('minutes', 0)
+        d['goals_scored'] = p.get('goals_scored', 0)
+        d['assists'] = p.get('assists', 0)
+        d['clean_sheets'] = p.get('clean_sheets', 0)
+        d['bonus'] = p.get('bonus', 0)
+        d['def_contrib'] = p.get('defensive_contribution', 0)
+        d['total_points'] = p.get('total_points', 0)
+
+        # 🔹 last gameweek points (pulled from gw_stats)
+        # careful: need to figure out last completed gw
+        data = load_fpl_from_gist()
+        events = data.get("bootstrap", {}).get("events", [])
+        last_gw = next((e for e in reversed(events) if e.get("finished")), None)
+        if last_gw:
+            last_stats = data.get("stats", {}).get(str(last_gw["id"]), {})
+            d['last_gw_points'] = last_stats.get(str(p['id']), {}).get("total_points", 0)
+        else:
+            d['last_gw_points'] = 0
+
         out.append(d)
 
     return out
