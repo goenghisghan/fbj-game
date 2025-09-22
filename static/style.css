@@ -453,13 +453,19 @@ a{color:#2563eb;text-decoration:none}a:hover{text-decoration:underline}
   flex-wrap: wrap;
   gap: 16px;
   margin-bottom: 12px;
+  align-items: center;
 }
 
-.filter-block {
-  flex-basis: 100%; /* force to next line */
+.filter-row {
+  display: flex;
+  gap: 16px;
+  flex-basis: 100%; /* full width row */
+  align-items: center;
 }
 
 #playerSearch {
-  padding: 4px 8px;
-  width: 150px;
+  padding: 6px 8px;
+  width: 200px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
 }
