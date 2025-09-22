@@ -29,18 +29,27 @@
 <thead><tr><th>Name</th><th>Club</th><th>Position</th><th>Total Points</th><th>Next Opp</th><th>Pick</th></tr></thead>
 <tbody>{% for player in players %}
 {% set club_taken = player.team_name in selected_clubs %}
-<tr><td>{{ player.first_name }} {{ player.second_name }}</td>
-<td>{{ player.team_name }}</td>
-<td>{{ player.position_name }}</td>
-<td>{{ player.total_points }}</td>
-<td>{{ player.next_opp }}</td>
-<td>
-{% if selected[player.position_name] or club_taken %}
-  <button class="btn" disabled>Pick</button>
-{% else %}
-  <button class="btn" type="button" onclick="pickPlayer('{{ player.position_name }}', {{ player.id }})">Pick</button>
-{% endif %}
-</td></tr>
+<tr>
+  <td>{{ player.web_name }}</td>
+  <td>
+    <img src="https://resources.premierleague.com/premierleague/badges/t{{ player.team_code }}.png"
+         alt="{{ player.team_name }}"
+         class="club-badge">
+  </td>
+  <td>
+    <span class="pos-badge pos-{{ player.position_name }}">
+      {{ player.position_name }}
+    </span>
+  </td>
+  <td>{{ player.total_points }}</td>
+  <td>{{ player.next_opp }}</td>
+  <td>
+  {% if selected[player.position_name] or club_taken %}
+    <button class="btn" disabled>Pick</button>
+  {% else %}
+    <button class="btn" type="button" onclick="pickPlayer('{{ player.position_name }}', {{ player.id }})">Pick</button>
+  {% endif %}
+  </td></tr>
 {% endfor %}</tbody></table>
 <div class="pagination">{% set qclub = request.args.get('club') or '' %}{% set qpos = request.args.get('position') or '' %}
 {% if current_page>1 %}<a href="?page={{ current_page-1 }}&club={{ qclub }}&position={{ qpos }}">Previous</a>{% endif %}
