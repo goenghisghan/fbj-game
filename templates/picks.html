@@ -27,9 +27,23 @@
   <div class="filters">
   <input type="text" id="playerSearch" placeholder="Search players..." onkeyup="filterPlayers()">
   </div>
+  <div class="filters">
+  <label>
+    <input type="checkbox" id="toggleExtra" onchange="toggleExtraColumns()"> Show extra stats
+  </label>
+  </div>
 </form>
 <table class="table">
-<thead><tr><th>Name</th><th>Pick</th><th>Club</th><th>Pos</th><th>Pts</th><th>Next Opp</th></tr></thead>
+<thead><tr><th>Name</th><th>Pick</th><th>Club</th><th>Pos</th><th>Pts</th><th>Next Opp</th>
+    <th class="extra-col">GW Pts</th>
+    <th class="extra-col">Mins</th>
+    <th class="extra-col">Goals</th>
+    <th class="extra-col">Assists</th>
+    <th class="extra-col">Cleans</th>
+    <th class="extra-col">Bonus</th>
+    <th class="extra-col">DCs</th>
+  </tr>
+</thead>>
 <tbody>{% for player in players %}
 {% set club_taken = player.team_name in selected_clubs %}
 <tr>
@@ -53,6 +67,13 @@
   </td>
   <td>{{ player.total_points }}</td>
   <td>{{ player.next_opp }}</td>
+  <td class="extra-col">{{ player.last_gw_points }}</td>
+  <td class="extra-col">{{ player.minutes }}</td>
+  <td class="extra-col">{{ player.goals_scored }}</td>
+  <td class="extra-col">{{ player.assists }}</td>
+  <td class="extra-col">{{ player.clean_sheets }}</td>
+  <td class="extra-col">{{ player.bonus }}</td>
+  <td class="extra-col">{{ player.def_contrib }}</td>
 </tr>
 {% endfor %}</tbody></table>
 <div class="pagination">{% set qclub = request.args.get('club') or '' %}{% set qpos = request.args.get('position') or '' %}
@@ -84,6 +105,14 @@ function filterPlayers() {
       row.style.display = "none";
     }
   });
+}
+function toggleExtraColumns() {
+  let table = document.querySelector(".picks-table");
+  if (document.getElementById("toggleExtra").checked) {
+    table.classList.add("show-extra");
+  } else {
+    table.classList.remove("show-extra");
+  }
 }
 </script>
 {% endblock %}
