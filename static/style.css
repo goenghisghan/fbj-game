@@ -439,3 +439,11 @@ a{color:#2563eb;text-decoration:none}a:hover{text-decoration:underline}
     padding: 4px;
   }
 }
+
+.extra-col {
+  display: none; /* hidden by default */
+}
+
+.show-extra .extra-col {
+  display: table-cell; /* visible when toggled */
+}
