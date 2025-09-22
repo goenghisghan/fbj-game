@@ -38,7 +38,7 @@ a{color:#2563eb;text-decoration:none}a:hover{text-decoration:underline}
   border-right: 1px solid #ccc;
   align-items: center;
   justify-content: center;
-  font-size: 0.8rem;
+  font-size: 0.4rem;
   color: #374151;
 }
 .scale .seg:last-child {
