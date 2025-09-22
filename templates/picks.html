@@ -39,9 +39,9 @@
   {% endif %}
   </td>
   <td>
-    <img src="https://resources.premierleague.com/premierleague/badges/t{{ player.team_code }}.png"
-         alt="{{ player.team_name }}"
-         class="club-badge">
+  {% if player.kit_url %}
+    <img src="{{ player.kit_url }}" alt="{{ player.team_name }}" class="club-badge">
+  {% endif %}
   </td>
   <td>
     <span class="pos-badge pos-{{ player.position_name }}">
