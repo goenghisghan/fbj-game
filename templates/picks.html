@@ -19,11 +19,25 @@
   <!-- Row 1 -->
   <div class="filter-row">
     <label>Club
-      <select name="club" onchange="this.form.submit()">…</select>
+      <select name="club" onchange="this.form.submit()">
+        <option value="">All</option>
+        {% for c in clubs %}
+          <option value="{{ c }}" {% if request.args.get('club')==c %}selected{% endif %}>
+            {{ c }}
+          </option>
+        {% endfor %}
+      </select>
     </label>
 
     <label>Position
-      <select name="position" onchange="this.form.submit()">…</select>
+      <select name="position" onchange="this.form.submit()">
+        <option value="">All</option>
+        {% for p in ['GK','DEF','MID','FWD'] %}
+          <option value="{{ p }}" {% if request.args.get('position')==p %}selected{% endif %}>
+            {{ p }}
+          </option>
+        {% endfor %}
+      </select>
     </label>
   </div>
 
@@ -33,53 +47,65 @@
     <input type="text" id="playerSearch" placeholder="Search players..." onkeyup="filterPlayers()">
 
     <label>
-      <input type="checkbox" id="toggleExtra" onchange="toggleExtraColumns()"> Show extra stats
+      <input type="checkbox" id="toggleExtra" onchange="toggleExtraColumns()">
+      Show extra stats
     </label>
   </div>
 </form>
-<table class="table">
-<thead><tr><th>Name</th><th>Pick</th><th>Club</th><th>Pos</th><th>Pts</th><th>Next Opp</th>
-    <th class="extra-col">GW Pts</th>
-    <th class="extra-col">Mins</th>
-    <th class="extra-col">Goals</th>
-    <th class="extra-col">Assists</th>
-    <th class="extra-col">Cleans</th>
-    <th class="extra-col">Bonus</th>
-    <th class="extra-col">DCs</th>
-  </tr>
-</thead>
-<tbody>{% for player in players %}
-{% set club_taken = player.team_name in selected_clubs %}
-<tr>
-  <td class="player-webname">{{ player.web_name }}</td>
-  <td>
-  {% if selected[player.position_name] or club_taken %}
-    <button class="btn" disabled>Pick</button>
-  {% else %}
-    <button class="btn" type="button" onclick="pickPlayer('{{ player.position_name }}', {{ player.id }})">Pick</button>
-  {% endif %}
-  </td>
-  <td>
-  {% if player.kit_url %}
-    <img src="{{ player.kit_url }}" alt="{{ player.team_name }}" class="club-badge">
-  {% endif %}
-  </td>
-  <td>
-    <span class="pos-badge pos-{{ player.position_name }}">
-      {{ player.position_name }}
-    </span>
-  </td>
-  <td>{{ player.total_points }}</td>
-  <td>{{ player.next_opp }}</td>
-  <td class="extra-col">{{ player.last_gw_points }}</td>
-  <td class="extra-col">{{ player.minutes }}</td>
-  <td class="extra-col">{{ player.goals_scored }}</td>
-  <td class="extra-col">{{ player.assists }}</td>
-  <td class="extra-col">{{ player.clean_sheets }}</td>
-  <td class="extra-col">{{ player.bonus }}</td>
-  <td class="extra-col">{{ player.def_contrib }}</td>
-</tr>
-{% endfor %}</tbody></table>
+
+<table class="table picks-table">
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Pick</th>
+      <th>Club</th>
+      <th>Pos</th>
+      <th>Pts</th>
+      <th>Next Opp</th>
+      <th class="extra-col">GW Pts</th>
+      <th class="extra-col">Mins</th>
+      <th class="extra-col">Goals</th>
+      <th class="extra-col">Assists</th>
+      <th class="extra-col">Cleans</th>
+      <th class="extra-col">Bonus</th>
+      <th class="extra-col">DCs</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for player in players %}
+    {% set club_taken = player.team_name in selected_clubs %}
+    <tr>
+      <td class="player-name">{{ player.web_name }}</td>
+      <td>
+        {% if selected[player.position_name] or club_taken %}
+          <button class="btn" disabled>Pick</button>
+        {% else %}
+          <button class="btn" type="button" onclick="pickPlayer('{{ player.position_name }}', {{ player.id }})">Pick</button>
+        {% endif %}
+      </td>
+      <td>
+        {% if player.kit_url %}
+          <img src="{{ player.kit_url }}" alt="{{ player.team_name }}" class="club-badge">
+        {% endif %}
+      </td>
+      <td>
+        <span class="pos-badge pos-{{ player.position_name }}">
+          {{ player.position_name }}
+        </span>
+      </td>
+      <td>{{ player.total_points }}</td>
+      <td>{{ player.next_opp }}</td>
+      <td class="extra-col">{{ player.last_gw_points }}</td>
+      <td class="extra-col">{{ player.minutes }}</td>
+      <td class="extra-col">{{ player.goals_scored }}</td>
+      <td class="extra-col">{{ player.assists }}</td>
+      <td class="extra-col">{{ player.clean_sheets }}</td>
+      <td class="extra-col">{{ player.bonus }}</td>
+      <td class="extra-col">{{ player.def_contrib }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
 <div class="pagination">{% set qclub = request.args.get('club') or '' %}{% set qpos = request.args.get('position') or '' %}
 {% if current_page>1 %}<a href="?page={{ current_page-1 }}&club={{ qclub }}&position={{ qpos }}">Previous</a>{% endif %}
  Page {{ current_page }} of {{ total_pages }}
