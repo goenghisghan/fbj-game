@@ -390,3 +390,52 @@ a{color:#2563eb;text-decoration:none}a:hover{text-decoration:underline}
   text-align: center;
   margin-top: 4px;
 }
+
+.club-badge {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+}
+
+/* base circle */
+.pos-badge {
+  display: inline-block;
+  width: 32px;
+  height: 32px;
+  line-height: 32px;
+  border-radius: 50%;
+  color: #fff;
+  font-weight: bold;
+  font-size: 0.75rem;
+  text-align: center;
+  margin: 0 auto;
+}
+
+/* color coding */
+.pos-GK { background: green; }
+.pos-DEF { background: red; }
+.pos-MID { background: blue; }
+.pos-FWD { background: black; }
+
+@media (max-width: 600px) {
+  .club-badge {
+    width: 18px;
+    height: 18px;
+  }
+
+  .pos-badge {
+    width: 24px;
+    height: 24px;
+    line-height: 24px;
+    font-size: 0.65rem;
+  }
+
+  .table.picks {
+    font-size: 0.75rem;
+  }
+
+  .table.picks th,
+  .table.picks td {
+    padding: 4px;
+  }
+}
