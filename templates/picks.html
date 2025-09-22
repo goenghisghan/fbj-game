@@ -75,7 +75,7 @@
     {% for player in players %}
     {% set club_taken = player.team_name in selected_clubs %}
     <tr>
-      <td class="player-name">{{ player.web_name }}</td>
+      <td class="player-webname">{{ player.web_name }}</td>
       <td>
         {% if selected[player.position_name] or club_taken %}
           <button class="btn" disabled>Pick</button>
