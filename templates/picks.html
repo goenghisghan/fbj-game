@@ -47,7 +47,7 @@
 <tbody>{% for player in players %}
 {% set club_taken = player.team_name in selected_clubs %}
 <tr>
-  <td>{{ player.web_name }}</td>
+  <td class="player-webname">{{ player.web_name }}</td>
   <td>
   {% if selected[player.position_name] or club_taken %}
     <button class="btn" disabled>Pick</button>
@@ -95,10 +95,10 @@ async function clearAll(){
 }
 function filterPlayers() {
   let input = document.getElementById("playerSearch").value.toLowerCase();
-  let rows = document.querySelectorAll(".picks-table tbody tr");
+  let rows = document.querySelectorAll(".table tbody tr");
 
   rows.forEach(row => {
-    let nameCell = row.querySelector(".player-name");
+    let nameCell = row.querySelector(".player-webname");
     if (nameCell && nameCell.textContent.toLowerCase().includes(input)) {
       row.style.display = "";
     } else {
@@ -107,7 +107,7 @@ function filterPlayers() {
   });
 }
 function toggleExtraColumns() {
-  let table = document.querySelector(".picks-table");
+  let table = document.querySelector(".table");
   if (document.getElementById("toggleExtra").checked) {
     table.classList.add("show-extra");
   } else {
