@@ -447,3 +447,19 @@ a{color:#2563eb;text-decoration:none}a:hover{text-decoration:underline}
 .show-extra .extra-col {
   display: table-cell; /* visible when toggled */
 }
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.filter-block {
+  flex-basis: 100%; /* force to next line */
+}
+
+#playerSearch {
+  padding: 4px 8px;
+  width: 200px;
+}
