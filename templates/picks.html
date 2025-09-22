@@ -26,7 +26,7 @@
     {% endfor %}</select></label>
 </form>
 <table class="table">
-<thead><tr><th>Name</th><th>Club</th><th>Position</th><th>Total Points</th><th>Next Opp</th><th>Pick</th></tr></thead>
+<thead><tr><th>Name</th><th>Pick</th><th>Club</th><th>Pos</th><th>Pts</th><th>Next Opp</th></tr></thead>
 <tbody>{% for player in players %}
 {% set club_taken = player.team_name in selected_clubs %}
 <tr>
