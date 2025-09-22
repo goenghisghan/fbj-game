@@ -24,6 +24,9 @@
     <option value="">All</option>{% for p in ['GK','DEF','MID','FWD'] %}
       <option value="{{ p }}" {% if request.args.get('position')==p %}selected{% endif %}>{{ p }}</option>
     {% endfor %}</select></label>
+  <div class="filters">
+  <input type="text" id="playerSearch" placeholder="Search players..." onkeyup="filterPlayers()">
+  </div>
 </form>
 <table class="table">
 <thead><tr><th>Name</th><th>Pick</th><th>Club</th><th>Pos</th><th>Pts</th><th>Next Opp</th></tr></thead>
@@ -68,6 +71,19 @@ async function removePlayer(position){
 async function clearAll(){
   const res=await fetch("{{ url_for('clear_team') }}",{method:"POST"});
   if(res.ok) location.reload();
+}
+function filterPlayers() {
+  let input = document.getElementById("playerSearch").value.toLowerCase();
+  let rows = document.querySelectorAll(".picks-table tbody tr");
+
+  rows.forEach(row => {
+    let nameCell = row.querySelector(".player-name");
+    if (nameCell && nameCell.textContent.toLowerCase().includes(input)) {
+      row.style.display = "";
+    } else {
+      row.style.display = "none";
+    }
+  });
 }
 </script>
 {% endblock %}
