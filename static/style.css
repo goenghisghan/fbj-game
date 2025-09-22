@@ -419,13 +419,13 @@ a{color:#2563eb;text-decoration:none}a:hover{text-decoration:underline}
 
 @media (max-width: 600px) {
   .club-badge {
-    width: 18px;
-    height: 18px;
+    width: 25px;
+    height: 25px;
   }
 
   .pos-badge {
-    width: 24px;
-    height: 24px;
+    width: 20px;
+    height: 20px;
     line-height: 24px;
     font-size: 0.65rem;
   }
