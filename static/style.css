@@ -20,7 +20,8 @@ a{color:#2563eb;text-decoration:none}a:hover{text-decoration:underline}
 
 .deadline {
   font-size: 1em;
-  color: #86efac;
+  background: #fca5a5;
+  color: #991b1b;
   margin-top: 20px;
   margin-bottom: 20px;
   font-weight: 100;
