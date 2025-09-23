@@ -1,5 +1,8 @@
 {% extends "base.html" %}{% block content %}
 <h2>Pick Team</h2>
+<p class="subtitle">
+  GW {{ next_gw }} deadline: {{ next_deadline }}
+</p>
 <div class="grid">
 {% for pos in ["GK","DEF","MID","FWD"] %}{% set p = selected[pos] %}
 <div class="card player-card">
