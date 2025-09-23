@@ -161,27 +161,27 @@ a{color:#2563eb;text-decoration:none}a:hover{text-decoration:underline}
   border-collapse: collapse;
   margin-top: 12px;
   width: 100%;
-  border-top: 3px solid #000;    /* solid top border */
-  border-bottom: 3px solid #000; /* solid bottom border */
+  /*border-top: 3px solid #000;    /* solid top border */
+  /*border-bottom: 3px solid #000; /* solid bottom border */
 }
 
 .table.picks td {
   padding: 6px 8px;
-  border-bottom: 1px dashed #444; /* thicker + darker */
+  /*border-bottom: 1px dashed #444; /* thicker + darker */
   text-align: left;
   vertical-align: middle;
 }
 
-/* vertical dividers */
+/* vertical dividers 
 .table.picks td.manager-cell,
 .table.picks th:first-child {
-  border-right: 1px solid #000;   /* solid black line after Manager */
+  border-right: 1px solid #000;   /* solid black line after Manager 
 }
 
 .table.picks td.total-cell,
 .table.picks th:last-child {
-  border-left: 1px solid #000;    /* solid black line before Total */
-}
+  border-left: 1px solid #000;   solid black line before Total
+}*/
 
 /* black background
 .table.picks td.manager-cell {
