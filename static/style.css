@@ -161,6 +161,8 @@ a{color:#2563eb;text-decoration:none}a:hover{text-decoration:underline}
   border-collapse: collapse;
   margin-top: 12px;
   width: 100%;
+  border-top: 3px solid #000;    /* solid top border */
+  border-bottom: 3px solid #000; /* solid bottom border */
 }
 
 .table.picks td {
