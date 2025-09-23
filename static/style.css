@@ -18,6 +18,14 @@ a{color:#2563eb;text-decoration:none}a:hover{text-decoration:underline}
   text-align: center;
 }
 
+.deadline {
+  font-size: 2em;
+  margin-top: 20px;
+  margin-bottom: 20px;
+  font-weight: 100;
+  text-align: center;
+}
+
 .scale-wrap {
   margin: 16px 0;
 }
