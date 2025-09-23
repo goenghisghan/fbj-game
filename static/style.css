@@ -165,7 +165,7 @@ a{color:#2563eb;text-decoration:none}a:hover{text-decoration:underline}
 
 .table.picks td {
   padding: 6px 8px;
-  border-bottom: 2px solid #444; /* thicker + darker */
+  border-bottom: 2px dotted #444; /* thicker + darker */
   text-align: left;
   vertical-align: middle;
 }
@@ -206,9 +206,16 @@ a{color:#2563eb;text-decoration:none}a:hover{text-decoration:underline}
   margin-right: 4px;
   border-radius: 4px;
 }
-.table.picks td strong {
-  font-size: 14px;
+
+/* alternating row shading */
+.table.picks tbody tr:nth-child(odd) {
+  background: #fefefe;  /* subtle white */
 }
+
+.table.picks tbody tr:nth-child(even) {
+  background: #f3f4f6;  /* light gray */
+}
+
 .clear-btn {
   display: block;
   margin: 20px auto;     /* space above and below */
