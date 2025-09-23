@@ -3,3 +3,4 @@ werkzeug
 requests
 gunicorn
 psycopg2-binary
+pytz
