@@ -1,6 +1,7 @@
 import os, requests, json, time, uuid, smtplib, math
 import psycopg2, psycopg2.extras
 from datetime import datetime, timezone
+import pytz
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -586,36 +587,86 @@ def live():
 
 @app.route('/picks')
 def picks():
-    if 'user_id' not in session: return redirect(url_for('login'))
-    uid=session['user_id']; email=session['email']
-    club=request.args.get('club'); position=request.args.get('position'); page=int(request.args.get('page',1))
-    data,teams,positions,events=bootstrap()
-    team_map={t['id']:t for t in data['teams']}
-    opp_map=next_opponents_by_team(team_map, events)
-    players=decorate_players(data['elements'],team_map,positions,opp_map)
-    players.sort(key=lambda x:x.get('total_points',0), reverse=True)
-    if club: players=[p for p in players if p['team_name']==club]
-    if position: players=[p for p in players if p['position_name']==position]
-    page_size=20; start=(page-1)*page_size; end=start+page_size
-    subset=players[start:end]; total_pages=(len(players)+page_size-1)//page_size
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    uid = session['user_id']
+    email = session['email']
 
+    # filters
+    club = request.args.get('club')
+    position = request.args.get('position')
+    page = int(request.args.get('page', 1))
+
+    # bootstrap data
+    data, teams, positions, events = bootstrap()
+    team_map = {t['id']: t for t in data['teams']}
+    opp_map = next_opponents_by_team(team_map, events)
+    players = decorate_players(data['elements'], team_map, positions, opp_map)
+    players.sort(key=lambda x: x.get('total_points', 0), reverse=True)
+
+    # apply filters
+    if club:
+        players = [p for p in players if p['team_name'] == club]
+    if position:
+        players = [p for p in players if p['position_name'] == position]
+
+    # pagination
+    page_size = 20
+    start = (page - 1) * page_size
+    end = start + page_size
+    subset = players[start:end]
+    total_pages = (len(players) + page_size - 1) // page_size
+
+    # current selections
     pending, gw_next = get_pending_picks(uid, events)
-    selected={'GK':None,'DEF':None,'MID':None,'FWD':None}
-    player_map={p['id']:p for p in data['elements']}
+    selected = {'GK': None, 'DEF': None, 'MID': None, 'FWD': None}
+    player_map = {p['id']: p for p in data['elements']}
     badge_template = load_fpl_from_gist().get("badge_template")
-    for pos,pid in pending.items():
-        p=player_map.get(pid)
-        if not p: continue
-        team=team_map[p['team']]
-        badge_url=badge_template.format(team['code'])
-        selected[pos]={'first_name':p['first_name'],'second_name':p['second_name'],'team_name':team['name'],'kit_url':badge_url}
-    selected_clubs=set([selected[pos]['team_name'] for pos in selected if selected[pos]])
+    for pos, pid in pending.items():
+        p = player_map.get(pid)
+        if not p:
+            continue
+        team = team_map[p['team']]
+        badge_url = badge_template.format(team['code'])
+        selected[pos] = {
+            'first_name': p['first_name'],
+            'second_name': p['second_name'],
+            'team_name': team['name'],
+            'kit_url': badge_url
+        }
+    selected_clubs = set([selected[pos]['team_name'] for pos in selected if selected[pos]])
 
-    class O(dict): __getattr__=dict.get
-    subset=[O(p) for p in subset]
-    clubs=sorted({team_map[p['team']]['name'] for p in data['elements']})
-    return render_template('picks.html',title='Pick Team',players=subset,selected=selected,selected_clubs=selected_clubs,clubs=clubs,current_page=page,total_pages=total_pages)
+    # wrap subset for easier attribute access
+    class O(dict):
+        __getattr__ = dict.get
+    subset = [O(p) for p in subset]
 
+    # list of clubs
+    clubs = sorted({team_map[p['team']]['name'] for p in data['elements']})
+
+    # find next gw and deadline
+    next_event = next((e for e in events if e.get("is_next")), None)
+    next_gw = next_event['id'] if next_event else None
+    next_deadline_fmt = None
+    if next_event and next_event.get('deadline_time'):
+        deadline_utc = datetime.fromisoformat(next_event['deadline_time'].replace("Z", "+00:00"))
+        uk_tz = pytz.timezone("Europe/London")
+        deadline_local = deadline_utc.astimezone(uk_tz)
+        next_deadline_fmt = deadline_local.strftime("%a %d %b, %H:%M UK")
+
+    return render_template(
+        'picks.html',
+        title='Pick Team',
+        players=subset,
+        selected=selected,
+        selected_clubs=selected_clubs,
+        clubs=clubs,
+        current_page=page,
+        total_pages=total_pages,
+        next_gw=next_gw,
+        next_deadline=next_deadline_fmt
+    )
+    
 @app.route('/pick_player', methods=['POST'])
 def pick_player():
     if 'user_id' not in session: return ('',401)
