@@ -1,12 +1,14 @@
 import os, requests, json, time, uuid, smtplib, math
 import psycopg2, psycopg2.extras
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import pytz
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'devsecret')
+
+app.permanent_session_lifetime = timedelta(days=30)
 
 app.config.update(
     SESSION_COOKIE_SAMESITE='Lax',
@@ -484,6 +486,7 @@ def login():
             if not confirmed:
                 flash("⚠️ Please confirm your email before logging in.", "warning")
             elif check_password_hash(hashed_pw, password):
+                session.permanent = True
                 session["user_id"] = uid
                 session["email"] = email
                 return redirect(url_for("welcome"))
