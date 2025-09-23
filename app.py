@@ -796,8 +796,8 @@ def finalize_gw():
     return redirect(url_for('league', gw=selected_gw))
 
 # Health check route
-@app.route("/health")
-def health():
+@app.route("/healthz")
+def healthz():
     return jsonify(status="ok"), 200
 
 if __name__ == "__main__":
