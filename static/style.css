@@ -170,13 +170,14 @@ a{color:#2563eb;text-decoration:none}a:hover{text-decoration:underline}
   vertical-align: middle;
 }
 
+/* black background
 .table.picks td.manager-cell {
-  background: #000;   /* black background */
-  color: #fff;        /* white text */
-  text-transform: uppercase; /* capitalise */
+  background: #000;    
+  color: #fff;        
+  text-transform: uppercase; 
   font-weight: bold;
   font-size: 0.6rem;
-}
+}*/
 
 .table.picks td.total-cell {
   text-align: right;
