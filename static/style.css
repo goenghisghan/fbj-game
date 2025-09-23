@@ -170,6 +170,17 @@ a{color:#2563eb;text-decoration:none}a:hover{text-decoration:underline}
   vertical-align: middle;
 }
 
+/* vertical dividers */
+.table.picks td.manager-cell,
+.table.picks th:first-child {
+  border-right: 1px solid #000;   /* solid black line after Manager */
+}
+
+.table.picks td.total-cell,
+.table.picks th:last-child {
+  border-left: 1px solid #000;    /* solid black line before Total */
+}
+
 /* black background
 .table.picks td.manager-cell {
   background: #000;    
