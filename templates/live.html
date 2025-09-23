@@ -72,7 +72,7 @@
   <tbody>
   {% for u in league_lineups %}
   <tr>
-    <td>{{ u.username }}</td>
+    <td class="manager-cell">{{ u.username }}</td>
     {% for pos in ["GK","DEF","MID","FWD"] %}
     <td>
       <div class="cell-content">
@@ -103,7 +103,7 @@
       </div>
     </td>
     {% endfor %}
-    <td><strong>{{ u.total }}</strong></td>
+    <td class="total-cell">{{ u.total }}</td>
   </tr>
   {% endfor %}
 </tbody>
