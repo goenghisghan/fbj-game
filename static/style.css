@@ -162,17 +162,41 @@ a{color:#2563eb;text-decoration:none}a:hover{text-decoration:underline}
   margin-top: 12px;
   width: 100%;
 }
-.table.picks th,
+
 .table.picks td {
   padding: 6px 8px;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 2px solid #444; /* thicker + darker */
   text-align: left;
   vertical-align: middle;
 }
+
+.table.picks td.manager-cell {
+  background: #000;   /* black background */
+  color: #fff;        /* white text */
+  text-transform: uppercase; /* capitalise */
+  font-weight: bold;
+}
+
+.table.picks td.total-cell {
+  text-align: right;
+  font-size: 1.4rem;  /* larger */
+  font-weight: bold;
+}
+
 .table.picks th {
   background: #f9fafb;
   font-weight: 600;
+  text-align: center;
 }
+
+.table.picks th:first-child {
+  text-align: left; /* Manager */
+}
+
+.table.picks th:last-child {
+  text-align: right; /* Total */
+}
+
 .table.picks img {
   width: 20px;
   height: 26px;
