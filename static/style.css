@@ -165,7 +165,7 @@ a{color:#2563eb;text-decoration:none}a:hover{text-decoration:underline}
 
 .table.picks td {
   padding: 6px 8px;
-  border-bottom: 2px dotted #444; /* thicker + darker */
+  border-bottom: 2px dashed #444; /* thicker + darker */
   text-align: left;
   vertical-align: middle;
 }
