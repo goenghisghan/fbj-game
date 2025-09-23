@@ -205,11 +205,11 @@ def get_display_name(user_id):
 
 def get_locked_picks(user_id, events):
     now = datetime.now(timezone.utc)
-    print("Given time now:", now)
+    app.logger.info(f"Given time now (UTC): {now}")
     cur_ev = next((e for e in events if e.get('is_current')), None)
     if not cur_ev: return {}, None
     deadline = datetime.fromisoformat(cur_ev['deadline_time'].replace('Z','+00:00'))
-    print("Deadline time:", deadline)
+    app.logger.info(f"Deadline time: {deadline}")
     if now < deadline: return {}, None
     gw_id = cur_ev['id']
     conn=db(); cur=conn.cursor()
