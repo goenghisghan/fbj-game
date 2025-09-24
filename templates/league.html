@@ -1,14 +1,14 @@
 {% extends "base.html" %}{% block content %}
 <h2>League Table</h2>
-<table class="table">
-  <thead><tr><th>Rank</th><th>Manager</th><th>Total League Pts</th><th>Avg GW Pts</th></tr></thead>
+<table class="table.league">
+  <thead><tr><th>Rank</th><th>Manager</th><th>League Pts</th><th>Avg GW Pts</th></tr></thead>
   <tbody>
   {% for row in league_rows %}
     <tr>
       <td>{{ loop.index }}</td>
       <td>{{ row.username }}</td>
       <td>{{ row.total_lp }}</td>
-      <td>{{ "%.2f"|format(row.avg_gw) }}</td>
+      <td>{{ "%.1f"|format(row.avg_gw) }}</td>
     </tr>
   {% endfor %}
   </tbody>
