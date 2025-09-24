@@ -39,3 +39,16 @@
   </tbody>
 </table>
 {% endblock %}
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const badges = document.querySelectorAll(".badge");
+  const total = badges.length;
+  
+  badges.forEach(badge => {
+    const rank = parseInt(badge.dataset.rank, 10);
+    const hue = 120 - ((rank - 1) / (total - 1)) * 120;
+    badge.style.backgroundColor = `hsl(${hue}, 80%, 40%)`;
+  });
+});
+</script>
