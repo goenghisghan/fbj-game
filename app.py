@@ -214,7 +214,7 @@ def get_locked_picks(user_id, events):
     if deadline.tzinfo is None:
         deadline = deadline.replace(tzinfo=timezone.utc)
     else:
-        deadline = deadline.astimezone(timezone.utc
+        deadline = deadline.astimezone(timezone.utc)
     if now < deadline: return {}, None
     gw_id = cur_ev['id']
     conn=db(); cur=conn.cursor()
