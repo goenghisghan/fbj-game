@@ -406,7 +406,10 @@ def get_gw_lineup_for_users(events, data):
 # ----------------- ROUTES -----------------
 @app.route('/')
 def root():
-    return redirect(url_for('login'))
+    if "user_id" in session:
+        return redirect(url_for("welcome"))
+    else:
+        return redirect(url_for("login"))
 
 @app.route("/register", methods=["GET", "POST"])
 def register():
