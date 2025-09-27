@@ -363,7 +363,7 @@ def get_gw_lineup_for_users(events, data):
                 p = player_map[pid]
                 if p.get('photo'):
                   photo_id = p.get('photo', '').split('.')[0]
-                  photo_url = f'https://resources.premierleague.com/premierleague/photos/players/40x40/p{photo_id}.png'
+                  photo_url = f'https://resources.premierleague.com/premierleague25/photos/players/40x40/p{photo_id}.png'
                 else:
                   photo_url = url_for('static', filename='question.png')
                     
