@@ -690,10 +690,10 @@ def my_leagues():
     cur.execute("""
         SELECT l.id, l.name, COUNT(m2.user_id) AS member_count
         FROM leagues l
-        JOIN league_members m ON m.league.id = 1.id
+        JOIN league_members m ON m.league.id = l.id
         JOIN league_members m2 ON m2.league_id = l.id
         WHERE m.user_id = %s
-        GROUP BU 1.id, 1.name
+        GROUP BY l.id, l.name
         ORDER BY l.name ASC
     """, (uid,))
     leagues = [{'id': r[0], 'name': r[1], 'member_count': r[2]} for r in cur.fetchall()]
