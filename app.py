@@ -635,32 +635,37 @@ def join_league():
     if 'user_id' not in session:
         return redirect(url_for('login'))
 
+    uid = session['user_id']
+    conn = db(); cur = conn.cursor()
+
+    # leagues user is already in
+    cur.execute("SELECT league_id FROM league_members WHERE user_id=%s", (uid,))
+    joined_ids = {row[0] for row in cur.fetchall()}
+
+    # list leagues not joined yet
+    cur.execute("""
+        SELECT l.id, l.name, u.display_name AS creator
+        FROM leagues l
+        JOIN users u ON u.id = l.created_by
+        WHERE l.id <> ALL(%s)
+        ORDER BY l.name ASC
+    """, (list(joined_ids) or [0],))  # fallback to avoid empty array error
+    leagues = [{'id': r[0], 'name': r[1], 'creator': r[2]} for r in cur.fetchall()]
+    conn.close()
+
     if request.method == 'POST':
-        uid = session['user_id']
-        league_code = request.form.get('league_code')
-        if not league_code:
-            flash("League code required", "danger")
-            return redirect(url_for('join_league'))
-
+        league_id = int(request.form.get('league_id'))
         conn = db(); cur = conn.cursor()
-        cur.execute("SELECT id, name FROM leagues WHERE id=%s", (league_code,))
-        league = cur.fetchone()
-        if not league:
-            flash("League not found", "danger")
-            conn.close()
-            return redirect(url_for('join_league'))
-
         cur.execute("""
             INSERT INTO league_members (league_id, user_id)
             VALUES (%s, %s)
             ON CONFLICT DO NOTHING
-        """, (league[0], uid))
+        """, (league_id, uid))
         conn.commit(); conn.close()
+        flash("Joined league successfully!", "success")
+        return redirect(url_for('my_leagues'))
 
-        flash(f"Joined league {league[1]}", "success")
-        return redirect(url_for('league', league_id=league[0]))
-
-    return render_template("join_league.html", title="Join League")
+    return render_template("join_league.html", title="Join League", leagues=leagues)
     
 @app.route('/fbj/my_leagues')
 def my_leagues():
