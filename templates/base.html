@@ -31,40 +31,41 @@
 <body>
   <div class="nav">
     <!-- Left side: FatZone + game logos -->
-    <div class="nav-logos">
-  <!-- FatZone logo (always home, no active state needed) -->
-  <a href="{{ url_for('welcome') }}">
-    <img src="{{ url_for('static', filename='fatzoneplain.png') }}" alt="FATZONE">
-  </a>
+    <div class="nav-left">
+      <!-- FatZone logo -->
+      <a href="{{ url_for('welcome') }}"
+         class="{% if request.endpoint == 'welcome' %}active-logo{% endif %}">
+        <img src="{{ url_for('static', filename='fatzoneplain.png') }}" alt="FATZONE">
+      </a>
 
-  <!-- FBJ logo -->
-  <a href="{{ url_for('my_leagues') }}"
-     class="{% if request.endpoint in ['my_leagues','picks','live','league'] %}active-logo{% endif %}">
-    <img src="{{ url_for('static', filename='fantasy_blackjack_badge_padded.png') }}" alt="FBJ">
-  </a>
+      <!-- FBJ logo -->
+      <a href="{{ url_for('my_leagues') }}"
+         class="{% if request.endpoint in ['my_leagues','picks','live','league'] %}active-logo{% endif %}">
+        <img src="{{ url_for('static', filename='fantasy_blackjack_badge_padded.png') }}" alt="FBJ">
+      </a>
 
-  <!-- Draft Pyramid logo -->
-  <a href="{{ url_for('draft_pyramid_home') }}"
-     class="{% if request.endpoint == 'draft_pyramid_home' %}active-logo{% endif %}">
-    <img src="{{ url_for('static', filename='pyramid_logo.png') }}" alt="Draft Pyramid">
-  </a>
+      <!-- Draft Pyramid logo -->
+      <a href="{{ url_for('draft_pyramid_home') }}"
+         class="{% if request.endpoint == 'draft_pyramid_home' %}active-logo{% endif %}">
+        <img src="{{ url_for('static', filename='pyramid_logo.png') }}" alt="Draft Pyramid">
+      </a>
 
-  <!-- Draft Playoffs logo -->
-  <a href="{{ url_for('draft_playoffs_home') }}"
-     class="{% if request.endpoint == 'draft_playoffs_home' %}active-logo{% endif %}">
-    <img src="{{ url_for('static', filename='playoffs_logo.png') }}" alt="Draft Playoffs">
-  </a>
-</div>
+      <!-- Draft Playoffs logo -->
+      <a href="{{ url_for('draft_playoffs_home') }}"
+         class="{% if request.endpoint == 'draft_playoffs_home' %}active-logo{% endif %}">
+        <img src="{{ url_for('static', filename='playoffs_logo.png') }}" alt="Draft Playoffs">
+      </a>
+    </div>
 
-    <!-- Right side: user links -->
+    <!-- Right side nav links -->
     <div class="nav-links">
       {% if session.get('user_id') %}
-        {% if request.endpoint in ['picks', 'live', 'league', 'my_leagues'] %}
-          <a href="{{ url_for('picks', league_id=session.get('current_league')) }}"
+        {% if league_id is defined %}
+          <a href="{{ url_for('picks', league_id=league_id) }}"
              class="{% if request.endpoint == 'picks' %}active{% endif %}">Pick Team</a>
-          <a href="{{ url_for('live', league_id=session.get('current_league')) }}"
+          <a href="{{ url_for('live', league_id=league_id) }}"
              class="{% if request.endpoint == 'live' %}active{% endif %}">Live GW</a>
-          <a href="{{ url_for('league', league_id=session.get('current_league')) }}"
+          <a href="{{ url_for('league', league_id=league_id) }}"
              class="{% if request.endpoint == 'league' %}active{% endif %}">League</a>
         {% endif %}
         <a href="{{ url_for('logout') }}">Logout</a>
