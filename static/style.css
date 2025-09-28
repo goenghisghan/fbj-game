@@ -8,11 +8,11 @@ a{color:#2563eb;text-decoration:none}a:hover{text-decoration:underline}
 .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}@media (max-width:900px){.grid{grid-template-columns:repeat(2,1fr)}}@media (max-width:580px){.grid{grid-template-columns:1fr}}
 .grid-home {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  max-width: 640px;       /* 2 cards max across (≈ 2×260px + gap) */
-  margin: 0 auto;         /* center the grid container */
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); /* allow shrinking */
+  max-width: 100%;           /* no hard cap, fits screen */
+  margin: 0 auto;
   gap: 16px;
-  justify-items: center;  /* center cards in their cells */
+  justify-items: center;
 }
 
 .grid-home .card {
