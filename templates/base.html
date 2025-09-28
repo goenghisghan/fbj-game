@@ -19,6 +19,16 @@
   <meta name="twitter:description" content="Play Fantasy Blackjack and Draft Playoffs all in one place.">
   <meta name="twitter:image" content="{{ url_for('static', filename='fatzoneplain.png', _external=True) }}">
 
+<!-- Standard favicon -->
+<link rel="icon" href="{{ url_for('static', filename='fatzoneplain.png') }}" type="image/png">
+
+<!-- For iOS Add to Home Screen -->
+<link rel="apple-touch-icon" href="{{ url_for('static', filename='fatzoneplain.png') }}">
+
+<!-- For Android/Chrome -->
+<link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+<meta name="theme-color" content="#000000">
+
   <!-- Existing CSS/fonts -->
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
   <link href="https://fonts.googleapis.com/css2?family=Chivo:wght@300;400;500;700&display=swap" rel="stylesheet">
