@@ -9,7 +9,7 @@
   <div class="card player-card" style="text-align:center">
     <h3 style="margin:6px 0">{{ league.name }}</h3>
     <p class="meta">Created by {{ league.creator }}</p>
-    <a href="{{ url_for('league', league_id=league.id) }}" class="btn" style="margin-top:10px">Enter League</a>
+    <a href="{{ url_for('league', league_id=league.id) }}" class="btn btn-black" style="margin-top:10px">View League</a>
   </div>
   {% endfor %}
   </div>
@@ -28,7 +28,7 @@
       </li>
       <li><strong>Season standings:</strong> Highest total LP wins.</li>
     </ul>
-    <a class="btn" href="{{ url_for('rules') }}">📜 Full rules</a>
+    <a class="btn btn-red" href="{{ url_for('rules') }}">📜 Full rules</a>
   </div>
 </div>
 {% endblock %}
