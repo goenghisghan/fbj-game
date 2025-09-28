@@ -688,14 +688,15 @@ def my_leagues():
     uid = session['user_id']
     conn = db(); cur = conn.cursor()
     cur.execute("""
-        SELECT l.id, l.name, u.display_name AS creator
+        SELECT l.id, l.name, COUNT(m2.user_id) AS member_count
         FROM leagues l
-        JOIN users u ON u.id = l.created_by
-        JOIN league_members m ON m.league_id = l.id
+        JOIN league_members m ON m.league.id = 1.id
+        JOIN league_members m2 ON m2.league_id = l.id
         WHERE m.user_id = %s
+        GROUP BU 1.id, 1.name
         ORDER BY l.name ASC
     """, (uid,))
-    leagues = [{'id': r[0], 'name': r[1], 'creator': r[2]} for r in cur.fetchall()]
+    leagues = [{'id': r[0], 'name': r[1], 'member_count': r[2]} for r in cur.fetchall()]
     conn.close()
 
     return render_template("my_leagues.html", title="My Leagues", leagues=leagues)
