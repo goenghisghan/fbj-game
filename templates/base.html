@@ -10,43 +10,18 @@
     body, input, button, select, textarea {
       font-family: 'Chivo', sans-serif;
     }
-    .nav {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 8px 16px;
-      background: #fff;
-      border-bottom: 1px solid #ddd;
-    }
-    .nav-left {
-      display: flex;
-      align-items: center;
-      gap: 16px;
-    }
-    .nav-left img {
-      height: 36px;
-      width: auto;
-    }
-    .nav-links a {
-      margin-left: 16px;
-      text-decoration: none;
-      font-weight: 500;
-      color: #333;
-    }
-    .nav-links a.active {
-      color: #2563eb;
-    }
-    .nav-left a img {
+
+    .nav-logos a img {
       transition: transform 0.2s ease, box-shadow 0.2s ease;
     }
 
-    .nav-left a:hover img {
+    .nav-logos a:hover img {
       transform: scale(1.05);
       box-shadow: 0 2px 6px rgba(0,0,0,0.15);
       border-radius: 6px; /* optional: gives a cleaner hover */
     }
     
-    .nav-left a.active-logo img {
+    .nav-logos a.active-logo img {
       border: 2px solid #2563eb;
       border-radius: 6px;
       box-shadow: 0 0 8px rgba(37,99,235,0.4);
@@ -56,7 +31,7 @@
 <body>
   <div class="nav">
     <!-- Left side: FatZone + game logos -->
-    <div class="nav-left">
+    <div class="nav-logos">
   <!-- FatZone logo (always home, no active state needed) -->
   <a href="{{ url_for('welcome') }}">
     <img src="{{ url_for('static', filename='fatzoneplain.png') }}" alt="FATZONE">
