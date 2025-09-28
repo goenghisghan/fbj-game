@@ -1,8 +1,13 @@
-{% extends "base.html" %}{% block content %}
-<h2>Pick Team</h2>
+{% extends "base.html" %}
+{% block content %}
+<h2>Pick Team </h2> 
+<p class="subtitle">
+  League: {{ league_name }}
+  </p>
 <p class="deadline">
   GW {{ next_gw }} deadline: {{ next_deadline }}
 </p>
+
 <div class="grid">
 {% for pos in ["GK","DEF","MID","FWD"] %}{% set p = selected[pos] %}
 <div class="card player-card">
@@ -17,7 +22,9 @@
   {% endif %}
 </div>{% endfor %}
 </div>
+
 <button class="clear-btn" onclick="clearAll()">Clear All</button>
+
 <form method="GET" class="filters">
   <!-- Row 1 -->
   <div class="filter-row">
@@ -109,23 +116,43 @@
     {% endfor %}
   </tbody>
 </table>
-<div class="pagination">{% set qclub = request.args.get('club') or '' %}{% set qpos = request.args.get('position') or '' %}
-{% if current_page>1 %}<a href="?page={{ current_page-1 }}&club={{ qclub }}&position={{ qpos }}">Previous</a>{% endif %}
- Page {{ current_page }} of {{ total_pages }}
-{% if current_page<total_pages %}<a href="?page={{ current_page+1 }}&club={{ qclub }}&position={{ qpos }}">Next</a>{% endif %}</div>
+
+<div class="pagination">
+  {% set qclub = request.args.get('club') or '' %}
+  {% set qpos = request.args.get('position') or '' %}
+  {% if current_page>1 %}
+    <a href="?page={{ current_page-1 }}&club={{ qclub }}&position={{ qpos }}">Previous</a>
+  {% endif %}
+  Page {{ current_page }} of {{ total_pages }}
+  {% if current_page<total_pages %}
+    <a href="?page={{ current_page+1 }}&club={{ qclub }}&position={{ qpos }}">Next</a>
+  {% endif %}
+</div>
+
 <script>
 async function pickPlayer(position, playerId){
-  const res=await fetch("{{ url_for('pick_player') }}",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({position,player_id:playerId})});
+  const res = await fetch(`/fbj/league/{{ league_id }}/pick_player`, {
+    method: "POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({position, player_id: playerId})
+  });
   if(res.ok) location.reload();
 }
+
 async function removePlayer(position){
-  const res=await fetch("{{ url_for('remove_player') }}",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({position})});
+  const res = await fetch(`/fbj/league/{{ league_id }}/remove_player`, {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({position})
+  });
   if(res.ok) location.reload();
 }
+
 async function clearAll(){
-  const res=await fetch("{{ url_for('clear_team') }}",{method:"POST"});
+  const res = await fetch(`/fbj/league/{{ league_id }}/clear_team`, {method:"POST"});
   if(res.ok) location.reload();
 }
+
 function filterPlayers() {
   let input = document.getElementById("playerSearch").value.toLowerCase();
   let rows = document.querySelectorAll(".table tbody tr");
@@ -139,6 +166,7 @@ function filterPlayers() {
     }
   });
 }
+
 function toggleExtraColumns() {
   let table = document.querySelector(".table");
   if (document.getElementById("toggleExtra").checked) {
