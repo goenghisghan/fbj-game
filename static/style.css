@@ -236,8 +236,10 @@ a{color:#2563eb;text-decoration:none}a:hover{text-decoration:underline}
 
 .table.picks img {
   width: 20px;
-  height: 26px;
+  height: 30px;
   vertical-align: middle;
+  object-fit: cover;
+  object-position: top;
   margin-right: 4px;
   border-radius: 4px;
 }
