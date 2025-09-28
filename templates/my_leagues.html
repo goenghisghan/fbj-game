@@ -13,9 +13,23 @@
     <a href="{{ url_for('league', league_id=league.id) }}" class="btn" style="margin-top:10px">Enter League</a>
   </div>
   {% endfor %}
-</div>
-<div style="margin-top:20px; text-align:center">
+  </div>
+  <div style="margin-top:20px; text-align:center">
   <a href="{{ url_for('create_league') }}" class="btn btn-secondary">Create League</a>
   <a href="{{ url_for('join_league') }}" class="btn">Join League</a>
+  </div>
+  <div class="quick-rules card">
+    <h2>⚡ Quick Rules</h2>
+    <ul>
+      <li><strong>Pick 4 players</strong> each gameweek: 1 GK, 1 DEF, 1 MID, 1 FWD (max 1 per club).</li>
+      <li><strong>Blackjack goal:</strong> Score exactly <strong>21 points</strong>. Over 21 = <strong>Bust → 0 points</strong>.</li>
+      <li><strong>Duplicate penalty:</strong> Shared picks start on negative points (scaled by league size).</li>
+      <li><strong>League points (LP):</strong>  
+        Blackjack (21) = 10 LP, 20 = 4 LP, 19 = 3 LP, 18 = 2 LP, 17 = 1 LP, ≤16 or bust = 0 LP.
+      </li>
+      <li><strong>Season standings:</strong> Highest total LP wins.</li>
+    </ul>
+    <a class="btn" href="{{ url_for('rules') }}">📜 Full rules</a>
+  </div>
 </div>
 {% endblock %}
