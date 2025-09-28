@@ -690,7 +690,7 @@ def my_leagues():
     cur.execute("""
         SELECT l.id, l.name, COUNT(m2.user_id) AS member_count
         FROM leagues l
-        JOIN league_members m ON m.league.id = l.id
+        JOIN league_members m ON m.league_id = l.id
         JOIN league_members m2 ON m2.league_id = l.id
         WHERE m.user_id = %s
         GROUP BY l.id, l.name
