@@ -2,7 +2,8 @@ import os, requests, json, time, uuid, smtplib, math
 import psycopg2, psycopg2.extras
 from datetime import datetime, timezone, timedelta
 import pytz
-from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
+from functools import wraps
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, g, abort
 from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
@@ -81,6 +82,8 @@ def db():
 
 def init_db():
     conn = db(); cur = conn.cursor()
+
+    # Users table (unchanged)
     cur.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id SERIAL PRIMARY KEY,
@@ -94,31 +97,184 @@ def init_db():
             display_name TEXT NOT NULL
         );
     """)
+
+    # Leagues table
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS leagues (
+            id SERIAL PRIMARY KEY,
+            name TEXT NOT NULL,
+            created_by INT REFERENCES users(id),
+            created_at TIMESTAMP DEFAULT now()
+        );
+    """)
+
+    # League memberships
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS league_members (
+            id SERIAL PRIMARY KEY,
+            league_id INT NOT NULL REFERENCES leagues(id) ON DELETE CASCADE,
+            user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            joined_at TIMESTAMP DEFAULT now(),
+            UNIQUE (league_id, user_id)
+        );
+    """)
+
+    # Picks (now linked to league_id)
     cur.execute("""
         CREATE TABLE IF NOT EXISTS picks (
             id SERIAL PRIMARY KEY,
-            user_id INTEGER NOT NULL REFERENCES users(id),
-            gameweek_id INTEGER NOT NULL,
+            user_id INT NOT NULL REFERENCES users(id),
+            league_id INT NOT NULL REFERENCES leagues(id),
+            gameweek_id INT NOT NULL,
             position TEXT NOT NULL,
-            player_id INTEGER NOT NULL,
+            player_id INT NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE(user_id, gameweek_id, position)
+            UNIQUE(user_id, league_id, gameweek_id, position)
         );
     """)
+
+    # Results (also linked to league_id)
     cur.execute("""
         CREATE TABLE IF NOT EXISTS results (
             id SERIAL PRIMARY KEY,
-            user_id INTEGER NOT NULL REFERENCES users(id),
-            gameweek_id INTEGER NOT NULL,
-            gw_points INTEGER NOT NULL,
-            league_points INTEGER NOT NULL,
+            user_id INT NOT NULL REFERENCES users(id),
+            league_id INT NOT NULL REFERENCES leagues(id),
+            gameweek_id INT NOT NULL,
+            gw_points INT NOT NULL,
+            league_points INT NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE(user_id, gameweek_id)
+            UNIQUE(user_id, league_id, gameweek_id)
         );
     """)
-    conn.commit(); conn.close()
+
+    conn.commit()
+    conn.close()
 
 init_db()
+
+def get_user_id(email):
+    conn=db(); cur=conn.cursor()
+    cur.execute('SELECT id FROM users WHERE email=%s', (email,))
+    r=cur.fetchone()
+    conn.close()
+    return r[0] if r else None
+
+def get_display_name(user_id):
+    conn=db(); cur=conn.cursor()
+    cur.execute('SELECT display_name FROM users WHERE id=%s', (user_id,))
+    r=cur.fetchone()
+    conn.close()
+    return r[0] if r else None
+
+# ----- League helpers -----
+def get_league(league_id):
+    conn = db(); cur = conn.cursor()
+    cur.execute("SELECT id, name, created_by FROM leagues WHERE id=%s", (league_id,))
+    row = cur.fetchone(); conn.close()
+    if not row: return None
+    return {"id": row[0], "name": row[1], "created_by": row[2]}
+
+def is_member(user_id, league_id):
+    conn = db(); cur = conn.cursor()
+    cur.execute("""
+        SELECT 1 FROM league_members
+        WHERE user_id=%s AND league_id=%s
+        LIMIT 1
+    """, (user_id, league_id))
+    ok = cur.fetchone() is not None
+    conn.close()
+    return ok
+
+def user_leagues(user_id):
+    conn = db(); cur = conn.cursor()
+    cur.execute("""
+        SELECT l.id, l.name
+        FROM leagues l
+        JOIN league_members m ON m.league_id = l.id
+        WHERE m.user_id=%s
+        ORDER BY l.name ASC
+    """, (user_id,))
+    rows = cur.fetchall(); conn.close()
+    return [{"id": r[0], "name": r[1]} for r in rows]
+
+# Decorator to enforce membership and load league
+def league_required(view):
+    @wraps(view)
+    def wrapper(league_id, *args, **kwargs):
+        if 'user_id' not in session:
+            return redirect(url_for('new_login'))
+        league = get_league(league_id)
+        if not league: abort(404)
+        if not is_member(session['user_id'], league_id):
+            flash("You’re not a member of that league.", "warning")
+            return redirect(url_for('fbj_home'))  # or your FBJ welcome page
+        g.league = league  # makes league available in view/templates
+        return view(league_id, *args, **kwargs)
+    return wrapper
+
+# League-scoped variants of your helpers
+def get_pending_picks_league(user_id, league_id, events):
+    nxt = next((e for e in events if e.get('is_next')), None)
+    if not nxt: nxt = next((e for e in events if not e.get('finished')), None)
+    if not nxt: return {}, None
+    gw_id = nxt['id']
+    conn=db(); cur=conn.cursor()
+    cur.execute("""
+        SELECT position, player_id
+        FROM picks
+        WHERE user_id=%s AND league_id=%s AND gameweek_id=%s
+    """, (user_id, league_id, gw_id))
+    rows=cur.fetchall(); conn.close()
+    return ({pos:pid for pos,pid in rows}, gw_id)
+
+def get_locked_picks_league(user_id, league_id, events):
+    now = datetime.now(timezone.utc)
+    cur_ev = next((e for e in events if e.get('is_current')), None)
+    if not cur_ev: return {}, None
+    deadline = datetime.fromisoformat(cur_ev['deadline_time'].replace('Z','+00:00'))
+    # ensure deadline is parsed as UTC
+    if deadline.tzinfo is None:
+        deadline = deadline.replace(tzinfo=timezone.utc)
+    else:
+        deadline = deadline.astimezone(timezone.utc)
+    if now < deadline: return {}, None
+    gw_id = cur_ev['id']
+    conn=db(); cur=conn.cursor()
+    cur.execute("""
+        SELECT position, player_id
+        FROM picks
+        WHERE user_id=%s AND league_id=%s AND gameweek_id=%s
+    """, (user_id, league_id, gw_id))
+    rows=cur.fetchall(); conn.close()
+    return ({pos: pid for pos, pid in rows}, gw_id)
+
+def get_player_pick_counts(gw_id, league_id):
+    conn=db(); cur=conn.cursor()
+    cur.execute("""
+        SELECT player_id, COUNT(*)::int
+        FROM picks
+        WHERE gameweek_id=%s AND league_id=%s
+        GROUP BY player_id
+    """, (gw_id, league_id))
+    counts = {row[0]: row[1] for row in cur.fetchall()}
+    conn.close()
+    return counts
+
+def get_valid_user_count(gw_id, league_id):
+    conn=db(); cur=db().cursor()
+    cur.execute("""
+        SELECT COUNT(*)::int
+        FROM (
+          SELECT user_id
+          FROM picks
+          WHERE gameweek_id=%s AND league_id=%s
+          GROUP BY user_id
+          HAVING COUNT(*) = 4
+        ) t
+    """, (gw_id, league_id))
+    n = cur.fetchone()[0] or 0
+    conn.close()
+    return n
 
 # ----------------- FPL HELPERS -----------------
 def bootstrap():
@@ -191,65 +347,10 @@ def decorate_players(players, teams, positions, opp_map):
 
     return out
 
-def get_user_id(email):
-    conn=db(); cur=conn.cursor()
-    cur.execute('SELECT id FROM users WHERE email=%s', (email,))
-    r=cur.fetchone()
-    conn.close()
-    return r[0] if r else None
-
-def get_display_name(user_id):
-    conn=db(); cur=conn.cursor()
-    cur.execute('SELECT display_name FROM users WHERE id=%s', (user_id,))
-    r=cur.fetchone()
-    conn.close()
-    return r[0] if r else None
-
-def get_locked_picks(user_id, events):
-    now = datetime.now(timezone.utc)
-    cur_ev = next((e for e in events if e.get('is_current')), None)
-    if not cur_ev: return {}, None
-    deadline = datetime.fromisoformat(cur_ev['deadline_time'].replace('Z','+00:00'))
-    # ensure deadline is parsed as UTC
-    if deadline.tzinfo is None:
-        deadline = deadline.replace(tzinfo=timezone.utc)
-    else:
-        deadline = deadline.astimezone(timezone.utc)
-    if now < deadline: return {}, None
-    gw_id = cur_ev['id']
-    conn=db(); cur=conn.cursor()
-    cur.execute(
-        'SELECT position, player_id FROM picks WHERE user_id=%s AND gameweek_id=%s',
-        (user_id, gw_id)
-    )
-    rows = cur.fetchall()
-    conn.close()
-    return ({pos: pid for pos, pid in rows}, gw_id)
-
-def get_pending_picks(user_id, events):
-    nxt = next((e for e in events if e.get('is_next')), None)
-    if not nxt: nxt = next((e for e in events if not e.get('finished')), None)
-    if not nxt: return {}, None
-    gw_id = nxt['id']
-    conn=db(); cur=conn.cursor()
-    cur.execute(
-        'SELECT position, player_id FROM picks WHERE user_id=%s AND gameweek_id=%s',
-        (user_id, gw_id)
-    )
-    rows=cur.fetchall()
-    conn.close()
-    print("Loading pending picks:", user_id, gw_id, rows)
-    return ({pos:pid for pos,pid in rows}, gw_id)
 
 def gw_stats_for_player(player_id, gw_round):
     data = load_fpl_from_gist()
     return data.get("stats", {}).get(str(gw_round), {}).get(str(player_id), {})
-
-def all_users():
-    conn=db(); cur=conn.cursor()
-    cur.execute('SELECT id, email, display_name FROM users ORDER BY display_name ASC')
-    rows=cur.fetchall(); conn.close()
-    return [{'id':r[0],'email':r[1], 'display_name':r[2]} for r in rows]
 
 def calc_penalty(n, total_users):
     """
@@ -267,33 +368,6 @@ def calc_penalty(n, total_users):
     else:  # 13+
         return math.ceil(0.5 * n - 0.5)
 
-def get_player_pick_counts(gw_id):
-    """
-    Returns a dict mapping player_id -> number of managers
-    who picked that player in the given gameweek.
-    """
-    conn = db(); cur = conn.cursor()
-    cur.execute("""
-        SELECT player_id, COUNT(*) 
-        FROM picks 
-        WHERE gameweek_id = %s
-        GROUP BY player_id
-    """, (gw_id,))
-    rows = cur.fetchall()
-    conn.close()
-    return {player_id: count for player_id, count in rows}
-
-def get_valid_user_count(gw_id):
-    conn = db(); cur = conn.cursor()
-    cur.execute("""
-        SELECT COUNT(DISTINCT user_id)
-        FROM picks
-        WHERE gameweek_id = %s
-    """, (gw_id,))
-    count = cur.fetchone()[0] or 0
-    conn.close()
-    return count
-
 def league_penalty_rule(total_users):
     if 1 <= total_users <= 6:
         return "Small league (1–6 users): penalty = -2 per player"
@@ -302,19 +376,20 @@ def league_penalty_rule(total_users):
     else:
         return "Large league (13+ users): penalty = -0.5 per player (rounded up)"
 
-def gw_stats_for_user(uid, gw_id):
+def gw_stats_for_user(uid, gw_id, league_id):
     conn = db(); cur = conn.cursor()
-    cur.execute(
-        'SELECT position, player_id FROM picks WHERE user_id=%s AND gameweek_id=%s',
-        (uid, gw_id)
-    )
+    cur.execute("""
+        SELECT position, player_id
+        FROM picks
+        WHERE user_id=%s AND gameweek_id=%s AND league_id=%s
+    """, (uid, gw_id, league_id))
     rows = cur.fetchall()
     conn.close()
     if not rows:
         return 0
 
-    pick_counts = get_player_pick_counts(gw_id)
-    total_users = get_valid_user_count(gw_id)
+    pick_counts = get_player_pick_counts(gw_id, league_id)
+    total_users = get_valid_user_count(gw_id, league_id)
 
     total = 0
     for _, pid in rows:
@@ -328,7 +403,8 @@ def gw_stats_for_user(uid, gw_id):
         total += pts
     return total
 
-def get_gw_lineup_for_users(events, data):
+
+def get_gw_lineup_for_users(events, data, league_id):
     cur_ev = next((e for e in events if e.get('is_current')), None)
     if not cur_ev:
         return [], None
@@ -336,21 +412,21 @@ def get_gw_lineup_for_users(events, data):
 
     team_map = {t['id']: t for t in data['teams']}
     player_map = {p['id']: p for p in data['elements']}
-    users = all_users()
+    users = league_users(league_id)  # 🔑 only members of this league
 
-    pick_counts = get_player_pick_counts(gw_id)
-    total_users = get_valid_user_count(gw_id)
+    pick_counts = get_player_pick_counts(gw_id, league_id)
+    total_users = get_valid_user_count(gw_id, league_id)
     rule_text = league_penalty_rule(total_users)
 
     results = []
     for u in users:
         uid = u['id']
-        conn = db()
-        cur = conn.cursor()
-        cur.execute(
-            'SELECT position, player_id FROM picks WHERE user_id=%s AND gameweek_id=%s',
-            (uid, gw_id)
-        )
+        conn = db(); cur = conn.cursor()
+        cur.execute("""
+            SELECT position, player_id
+            FROM picks
+            WHERE user_id=%s AND gameweek_id=%s AND league_id=%s
+        """, (uid, gw_id, league_id))
         rows = cur.fetchall()
         conn.close()
         picks = {pos: pid for pos, pid in rows}
@@ -362,11 +438,11 @@ def get_gw_lineup_for_users(events, data):
             if pid and pid in player_map:
                 p = player_map[pid]
                 if p.get('photo'):
-                  photo_id = p.get('photo', '').split('.')[0]
-                  photo_url = f'https://resources.premierleague.com/premierleague25/photos/players/110x140/{photo_id}.png'
+                    photo_id = p['photo'].split('.')[0]
+                    photo_url = f'https://resources.premierleague.com/premierleague25/photos/players/110x140/{photo_id}.png'
                 else:
-                  photo_url = url_for('static', filename='question.png')
-                    
+                    photo_url = url_for('static', filename='question.png')
+
                 hist = gw_stats_for_player(pid, gw_id) or {}
                 base_pts = hist.get('total_points', 0)
 
@@ -400,6 +476,7 @@ def get_gw_lineup_for_users(events, data):
             "lineup": lineup,
             "total": user_total
         })
+
     return results, gw_id
 
 
@@ -517,19 +594,102 @@ def welcome():
         return redirect(url_for('login'))
     return render_template('welcome.html', title='Welcome')
 
-@app.route("/rules")
+@app.route("/fbj/rules")
 def rules():
     return render_template("rules.html", title="Game Rules")
 
-@app.route('/live')
-def live():
+@app.route('/fbj/create_league', methods=['GET', 'POST'])
+def create_league():
     if 'user_id' not in session:
         return redirect(url_for('login'))
+
+    if request.method == 'POST':
+        name = request.form.get('name')
+        uid = session['user_id']
+        if not name:
+            flash("League name required", "danger")
+            return redirect(url_for('create_league'))
+
+        conn = db(); cur = conn.cursor()
+        cur.execute("""
+            INSERT INTO leagues (name, created_by)
+            VALUES (%s, %s)
+            RETURNING id
+        """, (name, uid))
+        league_id = cur.fetchone()[0]
+
+        cur.execute("""
+            INSERT INTO league_members (league_id, user_id)
+            VALUES (%s, %s)
+            ON CONFLICT DO NOTHING
+        """, (league_id, uid))
+        conn.commit(); conn.close()
+
+        flash(f"Created league {name}", "success")
+        return redirect(url_for('league', league_id=league_id))
+
+    return render_template("create_league.html", title="Create League")
+
+@app.route('/fbj/join_league', methods=['GET', 'POST'])
+def join_league():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    if request.method == 'POST':
+        uid = session['user_id']
+        league_code = request.form.get('league_code')
+        if not league_code:
+            flash("League code required", "danger")
+            return redirect(url_for('join_league'))
+
+        conn = db(); cur = conn.cursor()
+        cur.execute("SELECT id, name FROM leagues WHERE id=%s", (league_code,))
+        league = cur.fetchone()
+        if not league:
+            flash("League not found", "danger")
+            conn.close()
+            return redirect(url_for('join_league'))
+
+        cur.execute("""
+            INSERT INTO league_members (league_id, user_id)
+            VALUES (%s, %s)
+            ON CONFLICT DO NOTHING
+        """, (league[0], uid))
+        conn.commit(); conn.close()
+
+        flash(f"Joined league {league[1]}", "success")
+        return redirect(url_for('league', league_id=league[0]))
+
+    return render_template("join_league.html", title="Join League")
+    
+@app.route('/fbj/my_leagues')
+def my_leagues():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    uid = session['user_id']
+    conn = db(); cur = conn.cursor()
+    cur.execute("""
+        SELECT l.id, l.name, u.display_name AS creator
+        FROM leagues l
+        JOIN users u ON u.id = l.created_by
+        JOIN league_members m ON m.league_id = l.id
+        WHERE m.user_id = %s
+        ORDER BY l.name ASC
+    """, (uid,))
+    leagues = [{'id': r[0], 'name': r[1], 'creator': r[2]} for r in cur.fetchall()]
+    conn.close()
+
+    return render_template("my_leagues.html", title="My Leagues", leagues=leagues)
+
+@app.route('/fbj/league/<int:league_id>/live')
+@league_required
+def live(league_id):
     uid = session['user_id']
     display_name = get_display_name(uid)
 
     data, teams, positions, events = bootstrap()
-    locked, gw_id = get_locked_picks(uid, events)
+    locked, gw_id = get_locked_picks_league(uid, league_id, events)
 
     total_points = 0
     picks = {'GK': None, 'DEF': None, 'MID': None, 'FWD': None}
@@ -537,8 +697,8 @@ def live():
     if locked and gw_id:
         team_map = {t['id']: t for t in data['teams']}
         player_map = {p['id']: p for p in data['elements']}
-        pick_counts = get_player_pick_counts(gw_id)
-        total_users = get_valid_user_count(gw_id)
+        pick_counts = get_player_pick_counts(gw_id, league_id)
+        total_users = get_valid_user_count(gw_id, league_id)
         rule_text = league_penalty_rule(total_users)
 
         for pos in picks.keys():
@@ -563,7 +723,7 @@ def live():
                 'name': f"{p.get('first_name','')} {p.get('second_name','')}".strip(),
                 'team_name': teams[p['team']]['name'],
                 'photo_url': photo_url,
-                'base_points' : base_pts,
+                'base_points': base_pts,
                 'gw_points': gw_pts,
                 'penalty': penalty,
                 'pick_count': count,
@@ -584,22 +744,23 @@ def live():
                 } if hist else None)
             }
 
-    league_lineups, gw_id_all = get_gw_lineup_for_users(events, data)
+    league_lineups, gw_id_all = get_gw_lineup_for_users(events, data, league_id)
 
     return render_template(
         'live.html',
-        title='Live GW',
+        title=f"Live GW – {g.league['name']}",
         username=display_name,
         total_points=total_points,
         squad=picks,
         league_lineups=league_lineups,
-        gw_id_all=gw_id_all
+        gw_id_all=gw_id_all,
+        league_id=league_id,      # 🔑 pass to template for nav links
+        league_name=g.league['name']
     )
-
-@app.route('/picks')
-def picks():
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
+    
+@app.route('/fbj/league/<int:league_id>/picks')
+@league_required
+def picks(league_id):
     uid = session['user_id']
     email = session['email']
 
@@ -628,8 +789,8 @@ def picks():
     subset = players[start:end]
     total_pages = (len(players) + page_size - 1) // page_size
 
-    # current selections
-    pending, gw_next = get_pending_picks(uid, events)
+    # current selections (league-aware)
+    pending, gw_next = get_pending_picks_league(uid, league_id, events)
     selected = {'GK': None, 'DEF': None, 'MID': None, 'FWD': None}
     player_map = {p['id']: p for p in data['elements']}
     badge_template = load_fpl_from_gist().get("badge_template")
@@ -645,7 +806,7 @@ def picks():
             'team_name': team['name'],
             'kit_url': badge_url
         }
-    selected_clubs = set([selected[pos]['team_name'] for pos in selected if selected[pos]])
+    selected_clubs = {selected[pos]['team_name'] for pos in selected if selected[pos]}
 
     # wrap subset for easier attribute access
     class O(dict):
@@ -667,7 +828,7 @@ def picks():
 
     return render_template(
         'picks.html',
-        title='Pick Team',
+        title=f'Pick Team – {g.league["name"]}',
         players=subset,
         selected=selected,
         selected_clubs=selected_clubs,
@@ -675,137 +836,206 @@ def picks():
         current_page=page,
         total_pages=total_pages,
         next_gw=next_gw,
-        next_deadline=next_deadline_fmt
+        next_deadline=next_deadline_fmt,
+        league_id=league_id,
+        league_name=g.league["name"]
     )
     
-@app.route('/pick_player', methods=['POST'])
-def pick_player():
-    if 'user_id' not in session: return ('',401)
+@app.route('/fbj/league/<int:league_id>/pick_player', methods=['POST'])
+@league_required
+def pick_player(league_id):
+    if 'user_id' not in session:
+        return ('', 401)
+
     data_json = request.get_json(force=True)
-    position=data_json['position']; player_id=int(data_json['player_id'])
-    uid=session['user_id']; email=session['email']
-    data,teams,positions,events=bootstrap()
-    player=next((p for p in data['elements'] if p['id']==player_id),None)
-    if not player: return jsonify({'status':'error'}),400
-    pos_name=positions[player['element_type']]
-    if pos_name!=position: return jsonify({'status':'error'}),400
-    pending, gw_next = get_pending_picks(uid, events)
-    team_map={t['id']:t for t in data['teams']}
-    chosen_clubs=set()
-    for pos,pid in pending.items():
-        pp=next((e for e in data['elements'] if e['id']==pid),None)
-        if pp: chosen_clubs.add(team_map[pp['team']]['name'])
+    position = data_json['position']
+    player_id = int(data_json['player_id'])
+    uid = session['user_id']
+
+    # bootstrap
+    data, teams, positions, events = bootstrap()
+    player = next((p for p in data['elements'] if p['id'] == player_id), None)
+    if not player:
+        return jsonify({'status': 'error'}), 400
+
+    pos_name = positions[player['element_type']]
+    if pos_name != position:
+        return jsonify({'status': 'error'}), 400
+
+    # league-aware pending picks
+    pending, gw_next = get_pending_picks_league(uid, league_id, events)
+    team_map = {t['id']: t for t in data['teams']}
+
+    # enforce unique clubs
+    chosen_clubs = set()
+    for pos, pid in pending.items():
+        pp = next((e for e in data['elements'] if e['id'] == pid), None)
+        if pp:
+            chosen_clubs.add(team_map[pp['team']]['name'])
     if team_map[player['team']]['name'] in chosen_clubs:
-        return jsonify({'status':'error','msg':'Club already selected'}),400
-    print("Saving pick:", uid, gw_next, position, player_id)
-    conn=db(); cur=conn.cursor()
+        return jsonify({'status': 'error', 'msg': 'Club already selected'}), 400
+
+    print("Saving pick:", uid, league_id, gw_next, position, player_id)
+    conn = db(); cur = conn.cursor()
     cur.execute("""
-        INSERT INTO picks (user_id, gameweek_id, position, player_id)
-        VALUES (%s, %s, %s, %s)
-        ON CONFLICT (user_id, gameweek_id, position)
+        INSERT INTO picks (user_id, league_id, gameweek_id, position, player_id)
+        VALUES (%s, %s, %s, %s, %s)
+        ON CONFLICT (user_id, league_id, gameweek_id, position)
         DO UPDATE SET player_id = EXCLUDED.player_id
-    """, (uid, gw_next, position, player_id))
+    """, (uid, league_id, gw_next, position, player_id))
     conn.commit(); conn.close()
-    return jsonify({'status':'ok'})
+    return jsonify({'status': 'ok'})
 
-@app.route('/remove_player', methods=['POST'])
-def remove_player():
-    if 'user_id' not in session: return ('',401)
-    position=request.get_json(force=True)['position']
-    uid=session['user_id']; email=session['email']
-    data,teams,positions,events=bootstrap()
-    pending, gw_next = get_pending_picks(uid, events)
-    conn=db(); cur=conn.cursor()
-    cur.execute('DELETE FROM picks WHERE user_id=%s AND gameweek_id=%s AND position=%s', (uid, gw_next, position))
+@app.route('/fbj/league/<int:league_id>/remove_player', methods=['POST'])
+@league_required
+def remove_player(league_id):
+    if 'user_id' not in session:
+        return ('', 401)
+
+    position = request.get_json(force=True)['position']
+    uid = session['user_id']
+
+    data, teams, positions, events = bootstrap()
+    pending, gw_next = get_pending_picks_league(uid, league_id, events)
+
+    conn = db(); cur = conn.cursor()
+    cur.execute("""
+        DELETE FROM picks
+        WHERE user_id=%s AND league_id=%s AND gameweek_id=%s AND position=%s
+    """, (uid, league_id, gw_next, position))
     conn.commit(); conn.close()
-    return jsonify({'status':'ok'})
 
-@app.route('/clear_team', methods=['POST'])
-def clear_team():
-    if 'user_id' not in session: return ('',401)
-    uid=session['user_id']; email=session['email']
-    data,teams,positions,events=bootstrap()
-    pending, gw_next = get_pending_picks(uid, events)
-    conn=db(); cur=conn.cursor()
-    cur.execute('DELETE FROM picks WHERE user_id=%s AND gameweek_id=%s', (uid, gw_next))
+    return jsonify({'status': 'ok'})
+
+
+@app.route('/fbj/league/<int:league_id>/clear_team', methods=['POST'])
+@league_required
+def clear_team(league_id):
+    if 'user_id' not in session:
+        return ('', 401)
+
+    uid = session['user_id']
+    data, teams, positions, events = bootstrap()
+    pending, gw_next = get_pending_picks_league(uid, league_id, events)
+
+    conn = db(); cur = conn.cursor()
+    cur.execute("""
+        DELETE FROM picks
+        WHERE user_id=%s AND league_id=%s AND gameweek_id=%s
+    """, (uid, league_id, gw_next))
     conn.commit(); conn.close()
-    return jsonify({'status':'ok'})
 
-@app.route('/league', methods=['GET'])
-def league():
-    if 'user_id' not in session: return redirect(url_for('login'))
-    data,teams,positions,events=bootstrap()
-    users=all_users()
-    conn=db(); cur=conn.cursor()
+    return jsonify({'status': 'ok'})
+
+@app.route('/fbj/league/<int:league_id>/league', methods=['GET'])
+@league_required
+def league(league_id):
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    data, teams, positions, events = bootstrap()
+    users = league_users(league_id)  # ✅ only members of this league
+
+    conn = db(); cur = conn.cursor()
     cur.execute("""
         SELECT u.display_name,
-               COALESCE(SUM(r.league_points),0) as total_lp,
-               CASE WHEN COUNT(r.gw_points)>0
+               COALESCE(SUM(r.league_points), 0) AS total_lp,
+               CASE WHEN COUNT(r.gw_points) > 0
                     THEN AVG(CASE WHEN r.gw_points BETWEEN 0 AND 21 THEN r.gw_points ELSE 0 END)
-                    ELSE 0 END as avg_gw
+                    ELSE 0 END AS avg_gw
         FROM users u
-        LEFT JOIN results r ON r.user_id=u.id
+        JOIN league_members m ON m.user_id = u.id
+        LEFT JOIN results r ON r.user_id = u.id AND r.league_id = %s
+        WHERE m.league_id = %s
         GROUP BY u.id, u.display_name
         ORDER BY total_lp DESC, avg_gw DESC, u.display_name ASC
-    """)
-    league_rows=[{'username':r[0],'total_lp':int(r[1]),'avg_gw':float(r[2])} for r in cur.fetchall()]
+    """, (league_id, league_id))
+    league_rows = [
+        {'username': r[0], 'total_lp': int(r[1]), 'avg_gw': float(r[2])}
+        for r in cur.fetchall()
+    ]
 
-    sel_gw=request.args.get('gw',type=int)
+    # pick GW
+    sel_gw = request.args.get('gw', type=int)
     cur_ev = next((e for e in events if e.get('is_current')), None)
     nxt_ev = next((e for e in events if e.get('is_next')), None)
     default_gw = cur_ev['id'] if cur_ev else (nxt_ev['id'] if nxt_ev else 1)
     selected_gw = sel_gw or default_gw
 
-    cur.execute('SELECT user_id, gw_points, league_points FROM results WHERE gameweek_id=%s', (selected_gw,))
-    resmap={row[0]:{'gw_points':row[1],'league_points':row[2]} for row in cur.fetchall()}
-    history_rows=[]
+    # results for this GW
+    cur.execute("""
+        SELECT user_id, gw_points, league_points
+        FROM results
+        WHERE gameweek_id=%s AND league_id=%s
+    """, (selected_gw, league_id))
+    resmap = {row[0]: {'gw_points': row[1], 'league_points': row[2]} for row in cur.fetchall()}
+
+    history_rows = []
     for u in users:
         if u['id'] in resmap:
-            gwp=resmap[u['id']]['gw_points']; lp=resmap[u['id']]['league_points']
+            gwp = resmap[u['id']]['gw_points']
+            lp = resmap[u['id']]['league_points']
         else:
-            gwp=gw_stats_for_user(u['id'], selected_gw); lp=league_points_from_total(gwp)
-        display_points = f"{gwp}" if gwp<=21 else f"Bust ({gwp})"
-        history_rows.append({'username':u['display_name'],'gw_points':gwp,'display_points':display_points,'league_points':lp})
-    history_rows.sort(key=lambda r:(r['league_points'], r['gw_points']), reverse=True)
+            gwp = gw_stats_for_user(u['id'], selected_gw, league_id)
+            lp = league_points_from_total(gwp)
+        display_points = f"{gwp}" if gwp <= 21 else f"Bust ({gwp})"
+        history_rows.append({
+            'username': u['display_name'],
+            'gw_points': gwp,
+            'display_points': display_points,
+            'league_points': lp
+        })
+    history_rows.sort(key=lambda r: (r['league_points'], r['gw_points']), reverse=True)
 
+    # fixtures
     fixtures = load_fpl_from_gist().get("fixtures", [])
-    relevant=[f for f in fixtures if f.get('event')==selected_gw]
-    can_finalize=bool(relevant) and all(f.get('finished') for f in relevant)
+    relevant = [f for f in fixtures if f.get('event') == selected_gw]
+    can_finalize = bool(relevant) and all(f.get('finished') for f in relevant)
 
-    all_gws=[{'id':e['id']} for e in events]
+    all_gws = [{'id': e['id']} for e in events]
     return render_template(
         'league.html',
-        title='League & History',
+        title=f'League & History – {g.league["name"]}',
         league_rows=league_rows,
         history_rows=history_rows,
         all_gws=all_gws,
         selected_gw=selected_gw,
-        can_finalize=can_finalize
+        can_finalize=can_finalize,
+        league_id=league_id,
+        league_name=g.league['name']
     )
 
-@app.route('/finalize_gw', methods=['POST'])
-def finalize_gw():
-    if 'user_id' not in session: return redirect(url_for('login'))
-    data,teams,positions,events=bootstrap()
-    sel_gw=request.args.get('gw',type=int) or request.form.get('gw',type=int)
-    cur_ev=next((e for e in events if e.get('is_current')), None)
-    nxt_ev=next((e for e in events if e.get('is_next')), None)
+
+@app.route('/fbj/league/<int:league_id>/finalize_gw', methods=['POST'])
+@league_required
+def finalize_gw(league_id):
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    data, teams, positions, events = bootstrap()
+    sel_gw = request.args.get('gw', type=int) or request.form.get('gw', type=int)
+    cur_ev = next((e for e in events if e.get('is_current')), None)
+    nxt_ev = next((e for e in events if e.get('is_next')), None)
     selected_gw = sel_gw or (cur_ev['id'] if cur_ev else (nxt_ev['id'] if nxt_ev else 1))
-    users=all_users()
-    conn=db(); cur=conn.cursor()
+
+    users = league_users(league_id)
+
+    conn = db(); cur = conn.cursor()
     for u in users:
-        gwp=gw_stats_for_user(u['id'], selected_gw); lp=league_points_from_total(gwp)
+        gwp = gw_stats_for_user(u['id'], selected_gw, league_id)
+        lp = league_points_from_total(gwp)
         cur.execute("""
-            INSERT INTO results (user_id, gameweek_id, gw_points, league_points)
-            VALUES (%s, %s, %s, %s)
-            ON CONFLICT (user_id, gameweek_id)
+            INSERT INTO results (user_id, league_id, gameweek_id, gw_points, league_points)
+            VALUES (%s, %s, %s, %s, %s)
+            ON CONFLICT (user_id, league_id, gameweek_id)
             DO UPDATE SET gw_points = EXCLUDED.gw_points,
                           league_points = EXCLUDED.league_points
-        """, (u['id'], selected_gw, gwp, lp))
+        """, (u['id'], league_id, selected_gw, gwp, lp))
     conn.commit(); conn.close()
-    flash(f'Finalized GW {selected_gw} results.','success')
-    return redirect(url_for('league', gw=selected_gw))
 
+    flash(f'Finalized GW {selected_gw} results for {g.league["name"]}.', 'success')
+    return redirect(url_for('league', league_id=league_id, gw=selected_gw))
+    
 # Health check route
 @app.route("/healthz")
 def healthz():
