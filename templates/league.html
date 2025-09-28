@@ -1,7 +1,16 @@
-{% extends "base.html" %}{% block content %}
-<h2>League Table</h2>
+{% extends "base.html" %}
+{% block content %}
+<h2>League Table – {{ league_name }}</h2>
+
 <table class="table table-league">
-  <thead><tr><th>Rank</th><th>Manager</th><th>League Pts</th><th>Avg GW Pts</th></tr></thead>
+  <thead>
+    <tr>
+      <th>Rank</th>
+      <th>Manager</th>
+      <th>League Pts</th>
+      <th>Avg GW Pts</th>
+    </tr>
+  </thead>
   <tbody>
   {% for row in league_rows %}
     <tr>
@@ -13,6 +22,7 @@
   {% endfor %}
   </tbody>
 </table>
+
 <h3 style="margin-top:24px">Gameweek History</h3>
 <form method="GET" style="margin-bottom:10px">
   <label>Gameweek:
@@ -23,11 +33,22 @@
     </select>
   </label>
   {% if can_finalize %}
-    <button class="btn btn-secondary" formaction="{{ url_for('finalize_gw') }}" formmethod="post">Finalize This GW</button>
+    <button class="btn btn-secondary"
+            formaction="{{ url_for('finalize_gw', league_id=league_id) }}"
+            formmethod="post">
+      Finalize This GW
+    </button>
   {% endif %}
 </form>
+
 <table class="table">
-  <thead><tr><th>Manager</th><th>GW Points</th><th>League Points</th></tr></thead>
+  <thead>
+    <tr>
+      <th>Manager</th>
+      <th>GW Points</th>
+      <th>League Points</th>
+    </tr>
+  </thead>
   <tbody>
   {% for r in history_rows %}
     <tr>
@@ -38,6 +59,7 @@
   {% endfor %}
   </tbody>
 </table>
+
 <script>
 document.addEventListener("DOMContentLoaded", () => {
   const badges = document.querySelectorAll(".badge");
