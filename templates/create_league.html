@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card auth-card">
+  <h2>Create a League</h2>
+  <form method="POST">
+    <label for="name">League Name</label>
+    <input type="text" id="name" name="name" class="input" placeholder="Enter league name" required>
+
+    <button type="submit" class="btn" style="margin-top:12px">Create</button>
+  </form>
+</div>
+{% endblock %}
