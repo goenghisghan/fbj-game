@@ -1,8 +1,11 @@
-{% extends "base.html" %}{% block content %}
-<div class="center" style="flex-direction:column;text-align:center">
-  <img src="{{ url_for('static', filename='fatzoneplain.png') }}" alt="FatZone logo" style="max-width:260px;margin:5px auto;">
-  <h1>Welcome to FatZone</h1>
-  <p class="subtitle">👇Choose a game⚽️</p>
+{% extends "base.html" %}
+{% block content %}
+<div class="welcome-hub">
+  <!-- Big FatZone logo -->
+  <img src="{{ url_for('static', filename='fatzoneplain.png') }}" 
+       alt="FatZone" 
+       class="main-logo">
+
   <!-- Game navigation -->
   <div class="game-links">
     <div class="game-card">
