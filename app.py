@@ -1040,7 +1040,19 @@ def finalize_gw(league_id):
 
     flash(f'Finalized GW {selected_gw} results for {g.league["name"]}.', 'success')
     return redirect(url_for('league', league_id=league_id, gw=selected_gw))
-    
+
+@app.route("/draft_pyramid")
+def draft_pyramid_home():
+    if "user_id" not in session:
+        return redirect(url_for("login"))
+    return render_template("draft_pyramid_home.html", title="Draft Pyramid")
+
+@app.route("/draft_playoffs")
+def draft_playoffs_home():
+    if "user_id" not in session:
+        return redirect(url_for("login"))
+    return render_template("draft_playoffs_home.html", title="Draft Playoffs")
+
 # Health check route
 @app.route("/healthz")
 def healthz():
