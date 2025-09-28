@@ -111,12 +111,11 @@ a{color:#2563eb;text-decoration:none}a:hover{text-decoration:underline}
 
 .nav-logos {
   display: flex;
-  flex-direction: column;
   gap: 4px;
 }
 
 .nav-logos img {
-  height: 50px;
+  height: 40px;
 }
 
 .nav-inner {
