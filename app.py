@@ -550,7 +550,7 @@ def live():
                 continue
 
             photo_id = p.get('photo', '').split('.')[0]
-            photo_url = f'https://resources.premierleague.com/premierleague/photos/players/110x140/p{photo_id}.png'
+            photo_url = f'https://resources.premierleague.com/premierleague25/photos/players/110x140/{photo_id}.png'
             hist = gw_stats_for_player(pid, gw_id) or {}
             base_pts = hist.get('total_points', 0)
 
