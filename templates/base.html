@@ -3,7 +3,23 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+
   <title>{{ title or "FatZone" }}</title>
+
+  <!-- Open Graph (for WhatsApp, Facebook, LinkedIn, etc.) -->
+  <meta property="og:title" content="FatZone Games">
+  <meta property="og:description" content="Play Fantasy Blackjack and Draft Playoffs all in one place.">
+  <meta property="og:image" content="{{ url_for('static', filename='fatzoneplain.png', _external=True) }}">
+  <meta property="og:url" content="{{ request.url_root }}">
+  <meta property="og:type" content="website">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="FatZone Games">
+  <meta name="twitter:description" content="Play Fantasy Blackjack and Draft Playoffs all in one place.">
+  <meta name="twitter:image" content="{{ url_for('static', filename='fatzoneplain.png', _external=True) }}">
+
+  <!-- Existing CSS/fonts -->
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
   <link href="https://fonts.googleapis.com/css2?family=Chivo:wght@300;400;500;700&display=swap" rel="stylesheet">
   <style>
