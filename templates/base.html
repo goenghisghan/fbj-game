@@ -3,42 +3,93 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{{ title or "FBJ" }}</title>
+  <title>{{ title or "FatZone" }}</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
   <link href="https://fonts.googleapis.com/css2?family=Chivo:wght@300;400;500;700&display=swap" rel="stylesheet">
   <style>
     body, input, button, select, textarea {
       font-family: 'Chivo', sans-serif;
     }
+    .nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 16px;
+      background: #fff;
+      border-bottom: 1px solid #ddd;
+    }
+    .nav-left {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .nav-left img {
+      height: 36px;
+      width: auto;
+    }
+    .nav-links a {
+      margin-left: 16px;
+      text-decoration: none;
+      font-weight: 500;
+      color: #333;
+    }
+    .nav-links a.active {
+      color: #2563eb;
+    }
+    .nav-left a img {
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .nav-left a:hover img {
+      transform: scale(1.05);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+      border-radius: 6px; /* optional: gives a cleaner hover */
+    }
   </style>
 </head>
 <body>
   <div class="nav">
-    <div class="nav-logos">
-      <div>
-        <a href="{{ url_for('welcome') }}">
-          <img src="{{ url_for('static', filename='fatzoneplain.png') }}" alt="FATZONE">
-        </a>
-        <a href="{{ url_for('welcome') }}">
-          <img src="{{ url_for('static', filename='fantasy_blackjack_badge_padded.png') }}" alt="FBJ">
-        </a>
-      </div>
-      <div class="nav-links">
-        {% if session.get('user_id') %}
-          <a href="{{ url_for('picks') }}"
+    <!-- Left side: FatZone + game logos -->
+    <div class="nav-left">
+      <!-- FatZone logo (always home) -->
+      <a href="{{ url_for('welcome') }}">
+        <img src="{{ url_for('static', filename='fatzoneplain.png') }}" alt="FATZONE">
+      </a>
+
+      <!-- FBJ logo -->
+      <a href="{{ url_for('my_leagues') }}">
+        <img src="{{ url_for('static', filename='fantasy_blackjack_badge_padded.png') }}" alt="FBJ">
+      </a>
+
+      <!-- Draft Pyramid logo -->
+      <a href="{{ url_for('draft_pyramid_home') }}">
+        <img src="{{ url_for('static', filename='pyramid_logo.png') }}" alt="Draft Pyramid">
+      </a>
+
+      <!-- Draft Playoffs logo -->
+      <a href="{{ url_for('draft_playoffs_home') }}">
+        <img src="{{ url_for('static', filename='playoffs_logo.png') }}" alt="Draft Playoffs">
+      </a>
+    </div>
+
+    <!-- Right side: user links -->
+    <div class="nav-links">
+      {% if session.get('user_id') %}
+        {% if request.endpoint in ['picks', 'live', 'league', 'my_leagues'] %}
+          <a href="{{ url_for('picks', league_id=session.get('current_league')) }}"
              class="{% if request.endpoint == 'picks' %}active{% endif %}">Pick Team</a>
-          <a href="{{ url_for('live') }}"
+          <a href="{{ url_for('live', league_id=session.get('current_league')) }}"
              class="{% if request.endpoint == 'live' %}active{% endif %}">Live GW</a>
-          <a href="{{ url_for('league') }}"
+          <a href="{{ url_for('league', league_id=session.get('current_league')) }}"
              class="{% if request.endpoint == 'league' %}active{% endif %}">League</a>
-          <a href="{{ url_for('logout') }}">Logout</a>
-        {% else %}
-          <a href="{{ url_for('login') }}"
-             class="{% if request.endpoint == 'login' %}active{% endif %}">Login</a>
-          <a href="{{ url_for('register') }}"
-             class="{% if request.endpoint == 'register' %}active{% endif %}">Register</a>
         {% endif %}
-      </div>
+        <a href="{{ url_for('logout') }}">Logout</a>
+      {% else %}
+        <a href="{{ url_for('login') }}"
+           class="{% if request.endpoint == 'login' %}active{% endif %}">Login</a>
+        <a href="{{ url_for('register') }}"
+           class="{% if request.endpoint == 'register' %}active{% endif %}">Register</a>
+      {% endif %}
     </div>
   </div>
 
