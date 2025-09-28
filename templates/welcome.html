@@ -1,25 +1,24 @@
 {% extends "base.html" %}{% block content %}
 <div class="center" style="flex-direction:column;text-align:center">
-  <img src="{{ url_for('static', filename='fantasy_blackjack_badge_padded.png') }}" alt="FBJ logo" style="max-width:260px;margin:5px auto;">
-  <h1>Welcome to FBJ</h1>
-  <p class="subtitle">👇Scroll down for rules</p>
-  <div class="welcome-links">
-    <a class="btn btn-secondary" href="{{ url_for('picks') }}">Pick Team</a>
-    <a class="btn" href="{{ url_for('live') }}">Live GW</a>
-    <a class="btn" href="{{ url_for('league') }}">League</a>
-  </div>  
-  <div class="quick-rules card">
-    <h2>⚡ Quick Rules</h2>
-    <ul>
-      <li><strong>Pick 4 players</strong> each gameweek: 1 GK, 1 DEF, 1 MID, 1 FWD (max 1 per club).</li>
-      <li><strong>Blackjack goal:</strong> Score exactly <strong>21 points</strong>. Over 21 = <strong>Bust → 0 points</strong>.</li>
-      <li><strong>Duplicate penalty:</strong> Shared picks start on negative points (scaled by league size).</li>
-      <li><strong>League points (LP):</strong>  
-        Blackjack (21) = 10 LP, 20 = 4 LP, 19 = 3 LP, 18 = 2 LP, 17 = 1 LP, ≤16 or bust = 0 LP.
-      </li>
-      <li><strong>Season standings:</strong> Highest total LP wins.</li>
-    </ul>
-    <a class="btn" href="{{ url_for('rules') }}">📜 Full rules</a>
+  <img src="{{ url_for('static', filename='fatzoneplain.png') }}" alt="FatZone logo" style="max-width:260px;margin:5px auto;">
+  <h1>Welcome to FatZone</h1>
+  <p class="subtitle">👇Choose a game⚽️</p>
+  <!-- Game navigation -->
+  <div class="game-links">
+    <div class="game-card">
+      <img src="{{ url_for('static', filename='fantasy_blackjack_badge_padded.png') }}" alt="FBJ">
+      <a href="{{ url_for('my_leagues') }}">FBJ</a>
+    </div>
+
+    <div class="game-card">
+      <img src="{{ url_for('static', filename='pyramid_logo.png') }}" alt="Draft Pyramid">
+      <a href="{{ url_for('draft_pyramid_home') }}">Draft Pyramid</a>
+    </div>
+
+    <div class="game-card">
+      <img src="{{ url_for('static', filename='playoffs_logo.png') }}" alt="Draft Playoffs">
+      <a href="{{ url_for('draft_playoffs_home') }}">Draft Playoffs</a>
+    </div>
   </div>
 </div>
 {% endblock %}
