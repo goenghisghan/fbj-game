@@ -212,6 +212,19 @@ def league_required(view):
         return view(league_id, *args, **kwargs)
     return wrapper
 
+def league_users(league_id):
+    conn = db(); cur = conn.cursor()
+    cur.execute("""
+        SELECT u.id, u.display_name, u.email
+        FROM users u
+        JOIN league_members m ON m.user_id = u.id
+        WHERE m.league_id = %s
+        ORDER BY u.display_name ASC
+    """, (league_id,))
+    users = [{'id': r[0], 'display_name': r[1], 'email': r[2]} for r in cur.fetchall()]
+    conn.close()
+    return users
+
 # League-scoped variants of your helpers
 def get_pending_picks_league(user_id, league_id, events):
     nxt = next((e for e in events if e.get('is_next')), None)
