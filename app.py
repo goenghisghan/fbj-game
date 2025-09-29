@@ -391,13 +391,27 @@ def league_penalty_rule(total_users):
 
 def gw_stats_for_user(uid, gw_id, league_id):
     conn = db(); cur = conn.cursor()
+
+    # 1. Try cached results first
     cur.execute("""
-        SELECT position, player_id
-        FROM picks
-        WHERE user_id=%s AND gameweek_id=%s AND league_id=%s
-    """, (uid, gw_id, league_id))
+        SELECT gw_points 
+        FROM results 
+        WHERE user_id=%s AND league_id=%s AND gameweek_id=%s
+    """, (uid, league_id, gw_id))
+    row = cur.fetchone()
+    if row:
+        conn.close()
+        return row[0]  # ✅ return cached value immediately
+
+    # 2. Otherwise, calculate on the fly
+    cur.execute("""
+        SELECT position, player_id 
+        FROM picks 
+        WHERE user_id=%s AND league_id=%s AND gameweek_id=%s
+    """, (uid, league_id, gw_id))
     rows = cur.fetchall()
     conn.close()
+
     if not rows:
         return 0
 
@@ -406,14 +420,12 @@ def gw_stats_for_user(uid, gw_id, league_id):
 
     total = 0
     for _, pid in rows:
-        hist = gw_stats_for_player(pid, gw_id)
-        pts = hist.get('total_points', 0) if hist else 0
-
+        hist = gw_stats_for_player(pid, gw_id) or {}
+        pts = hist.get("total_points", 0)
         count = pick_counts.get(pid, 1)
         penalty = calc_penalty(count, total_users)
-        pts -= penalty
+        total += pts - penalty
 
-        total += pts
     return total
 
 
