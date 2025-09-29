@@ -25,6 +25,13 @@
 
 <button class="clear-btn" onclick="clearAll()">Clear All</button>
 
+<div class="sync-box">
+  <label>
+    <input type="checkbox" id="applyAllLeagues" onchange="toggleSync(this.checked)">
+    <span class="sync-label">🔄 Sync picks across ALL my leagues</span>
+  </label>
+</div>
+
 <form method="GET" class="filters">
   <!-- Row 1 -->
   <div class="filter-row">
@@ -175,5 +182,20 @@ function toggleExtraColumns() {
     table.classList.remove("show-extra");
   }
 }
+
+async function toggleSync(checked) {
+  if (checked) {
+    const res = await fetch("{{ url_for('sync_team_to_all', league_id=league_id) }}", {
+      method: "POST"
+    });
+    if (res.ok) {
+      location.reload(); // show the flash message
+    } else {
+      alert("Could not sync team to all leagues.");
+      document.getElementById("applyAllLeagues").checked = false;
+    }
+  }
+}
+
 </script>
 {% endblock %}
