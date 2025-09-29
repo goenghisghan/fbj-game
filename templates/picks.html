@@ -137,6 +137,18 @@
 </div>
 
 <script>
+document.addEventListener("DOMContentLoaded", () => {
+  const checkbox = document.getElementById("applyAllLeagues");
+  // Default ticked (true) if nothing saved yet
+  const saved = localStorage.getItem("applyAllLeagues");
+  checkbox.checked = saved === null ? true : saved === "true";
+
+  // Save preference on change
+  checkbox.addEventListener("change", () => {
+    localStorage.setItem("applyAllLeagues", checkbox.checked);
+  });
+});
+
 function getApplyAllFlag() {
   return document.getElementById("applyAllLeagues").checked;
 }
