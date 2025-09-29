@@ -137,26 +137,34 @@
 </div>
 
 <script>
+function getApplyAllFlag() {
+  return document.getElementById("applyAllLeagues").checked;
+}
+
 async function pickPlayer(position, playerId){
-  const res = await fetch(`/fbj/league/{{ league_id }}/pick_player`, {
-    method: "POST",
-    headers: {"Content-Type":"application/json"},
-    body: JSON.stringify({position, player_id: playerId})
+  const res = await fetch("{{ url_for('pick_player', league_id=league_id) }}", {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({position, player_id:playerId, apply_all:getApplyAllFlag()})
   });
   if(res.ok) location.reload();
 }
 
 async function removePlayer(position){
-  const res = await fetch(`/fbj/league/{{ league_id }}/remove_player`, {
+  const res = await fetch("{{ url_for('remove_player', league_id=league_id) }}", {
     method:"POST",
     headers:{"Content-Type":"application/json"},
-    body: JSON.stringify({position})
+    body: JSON.stringify({position, apply_all:getApplyAllFlag()})
   });
   if(res.ok) location.reload();
 }
 
 async function clearAll(){
-  const res = await fetch(`/fbj/league/{{ league_id }}/clear_team`, {method:"POST"});
+  const res = await fetch("{{ url_for('clear_team', league_id=league_id) }}", {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({apply_all:getApplyAllFlag()})
+  });
   if(res.ok) location.reload();
 }
 
