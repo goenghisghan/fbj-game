@@ -928,23 +928,30 @@ def sync_team_to_all(league_id):
     if not gw_id:
         return jsonify({'status': 'error', 'msg': 'No active gameweek'}), 400
 
+    # Get all leagues in the SAME connection
     conn = db(); cur = conn.cursor()
-    leagues = user_leagues(uid)
-    for l in leagues:
-        # clear existing picks in this league
+    cur.execute("""
+        SELECT l.id
+        FROM leagues l
+        JOIN league_members m ON m.league_id = l.id
+        WHERE m.user_id = %s
+    """, (uid,))
+    leagues = [row[0] for row in cur.fetchall()]
+
+    # Replace picks in every league with this league's current picks
+    for lid in leagues:
         cur.execute("""
             DELETE FROM picks
             WHERE user_id=%s AND league_id=%s AND gameweek_id=%s
-        """, (uid, l['id'], gw_id))
-
-        # insert the current league’s picks
+        """, (uid, lid, gw_id))
         for pos, pid in pending.items():
             cur.execute("""
                 INSERT INTO picks (user_id, league_id, gameweek_id, position, player_id)
                 VALUES (%s, %s, %s, %s, %s)
-            """, (uid, l['id'], gw_id, pos, pid))
+            """, (uid, lid, gw_id, pos, pid))
 
     conn.commit(); conn.close()
+
     flash("✅ Your current picks have been synced to all leagues.", "success")
     return jsonify({'status': 'ok'})
 
