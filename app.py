@@ -617,7 +617,7 @@ def logout():
 def welcome():
     if 'user_id' not in session:
         return redirect(url_for('login'))
-    return render_template('welcome.html', title='Welcome')
+    return render_template('welcome.html', title='FatZone')
 
 @app.route("/fbj/rules")
 def rules():
@@ -711,7 +711,7 @@ def my_leagues():
     leagues = [{'id': r[0], 'name': r[1], 'member_count': r[2]} for r in cur.fetchall()]
     conn.close()
 
-    return render_template("my_leagues.html", title="My Leagues", leagues=leagues)
+    return render_template("my_leagues.html", title="FBJ", leagues=leagues)
 
 @app.route('/fbj/league/<int:league_id>/live')
 @league_required
