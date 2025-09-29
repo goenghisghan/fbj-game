@@ -869,82 +869,141 @@ def pick_player(league_id):
     data_json = request.get_json(force=True)
     position = data_json['position']
     player_id = int(data_json['player_id'])
+    apply_all = data_json.get('apply_all', False)
     uid = session['user_id']
 
-    # bootstrap
+    # bootstrap etc...
     data, teams, positions, events = bootstrap()
     player = next((p for p in data['elements'] if p['id'] == player_id), None)
-    if not player:
-        return jsonify({'status': 'error'}), 400
-
+    if not player: return jsonify({'status': 'error'}), 400
     pos_name = positions[player['element_type']]
-    if pos_name != position:
-        return jsonify({'status': 'error'}), 400
+    if pos_name != position: return jsonify({'status': 'error'}), 400
 
-    # league-aware pending picks
     pending, gw_next = get_pending_picks_league(uid, league_id, events)
     team_map = {t['id']: t for t in data['teams']}
 
-    # enforce unique clubs
+    # enforce unique club (for current league only)
     chosen_clubs = set()
     for pos, pid in pending.items():
         pp = next((e for e in data['elements'] if e['id'] == pid), None)
-        if pp:
-            chosen_clubs.add(team_map[pp['team']]['name'])
+        if pp: chosen_clubs.add(team_map[pp['team']]['name'])
     if team_map[player['team']]['name'] in chosen_clubs:
-        return jsonify({'status': 'error', 'msg': 'Club already selected'}), 400
+        return jsonify({'status':'error','msg':'Club already selected'}),400
 
-    print("Saving pick:", uid, league_id, gw_next, position, player_id)
-    conn = db(); cur = conn.cursor()
+    # insert for this league
+    conn=db(); cur=conn.cursor()
     cur.execute("""
         INSERT INTO picks (user_id, league_id, gameweek_id, position, player_id)
         VALUES (%s, %s, %s, %s, %s)
         ON CONFLICT (user_id, league_id, gameweek_id, position)
         DO UPDATE SET player_id = EXCLUDED.player_id
     """, (uid, league_id, gw_next, position, player_id))
+
+    # also insert for all leagues (if checkbox ticked)
+    if apply_all:
+        leagues = user_leagues(uid)
+        for l in leagues:
+            if l['id'] == league_id: 
+                continue
+            cur.execute("""
+                INSERT INTO picks (user_id, league_id, gameweek_id, position, player_id)
+                VALUES (%s, %s, %s, %s, %s)
+                ON CONFLICT (user_id, league_id, gameweek_id, position)
+                DO UPDATE SET player_id = EXCLUDED.player_id
+            """, (uid, l['id'], gw_next, position, player_id))
+
     conn.commit(); conn.close()
+    return jsonify({'status': 'ok'})
+    
+@app.route('/fbj/league/<int:league_id>/sync_team_to_all', methods=['POST'])
+@league_required
+def sync_team_to_all(league_id):
+    if 'user_id' not in session:
+        return ('', 401)
+
+    uid = session['user_id']
+    data, teams, positions, events = bootstrap()
+    pending, gw_id = get_pending_picks_league(uid, league_id, events)
+
+    if not gw_id:
+        return jsonify({'status': 'error', 'msg': 'No active gameweek'}), 400
+
+    conn = db(); cur = conn.cursor()
+    leagues = user_leagues(uid)
+    for l in leagues:
+        # clear existing picks in this league
+        cur.execute("""
+            DELETE FROM picks
+            WHERE user_id=%s AND league_id=%s AND gameweek_id=%s
+        """, (uid, l['id'], gw_id))
+
+        # insert the current league’s picks
+        for pos, pid in pending.items():
+            cur.execute("""
+                INSERT INTO picks (user_id, league_id, gameweek_id, position, player_id)
+                VALUES (%s, %s, %s, %s, %s)
+            """, (uid, l['id'], gw_id, pos, pid))
+
+    conn.commit(); conn.close()
+    flash("✅ Your current picks have been synced to all leagues.", "success")
     return jsonify({'status': 'ok'})
 
 @app.route('/fbj/league/<int:league_id>/remove_player', methods=['POST'])
 @league_required
 def remove_player(league_id):
-    if 'user_id' not in session:
-        return ('', 401)
-
-    position = request.get_json(force=True)['position']
+    if 'user_id' not in session: return ('',401)
+    data_json = request.get_json(force=True)
+    position = data_json['position']
+    apply_all = data_json.get('apply_all', False)
     uid = session['user_id']
 
-    data, teams, positions, events = bootstrap()
+    data,teams,positions,events=bootstrap()
     pending, gw_next = get_pending_picks_league(uid, league_id, events)
-
-    conn = db(); cur = conn.cursor()
+    conn=db(); cur=conn.cursor()
     cur.execute("""
         DELETE FROM picks
         WHERE user_id=%s AND league_id=%s AND gameweek_id=%s AND position=%s
     """, (uid, league_id, gw_next, position))
+
+    if apply_all:
+        leagues = user_leagues(uid)
+        for l in leagues:
+            if l['id'] == league_id: continue
+            cur.execute("""
+                DELETE FROM picks
+                WHERE user_id=%s AND league_id=%s AND gameweek_id=%s AND position=%s
+            """, (uid, l['id'], gw_next, position))
+
     conn.commit(); conn.close()
-
-    return jsonify({'status': 'ok'})
-
+    return jsonify({'status':'ok'})
 
 @app.route('/fbj/league/<int:league_id>/clear_team', methods=['POST'])
 @league_required
 def clear_team(league_id):
-    if 'user_id' not in session:
-        return ('', 401)
-
+    if 'user_id' not in session: return ('',401)
+    data_json = request.get_json(force=True) or {}
+    apply_all = data_json.get('apply_all', False)
     uid = session['user_id']
-    data, teams, positions, events = bootstrap()
-    pending, gw_next = get_pending_picks_league(uid, league_id, events)
 
-    conn = db(); cur = conn.cursor()
+    data,teams,positions,events=bootstrap()
+    pending, gw_next = get_pending_picks_league(uid, league_id, events)
+    conn=db(); cur=conn.cursor()
     cur.execute("""
         DELETE FROM picks
         WHERE user_id=%s AND league_id=%s AND gameweek_id=%s
     """, (uid, league_id, gw_next))
-    conn.commit(); conn.close()
 
-    return jsonify({'status': 'ok'})
+    if apply_all:
+        leagues = user_leagues(uid)
+        for l in leagues:
+            if l['id'] == league_id: continue
+            cur.execute("""
+                DELETE FROM picks
+                WHERE user_id=%s AND league_id=%s AND gameweek_id=%s
+            """, (uid, l['id'], gw_next))
+
+    conn.commit(); conn.close()
+    return jsonify({'status':'ok'})
 
 @app.route('/fbj/league/<int:league_id>/league', methods=['GET'])
 @league_required
