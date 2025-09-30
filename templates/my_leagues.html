@@ -6,12 +6,25 @@
   <h2>My Leagues</h2>
   <div class="grid grid-home">
   {% for league in leagues %}
-  <div class="card player-card" style="text-align:center">
-    <h3 style="margin:6px 0">{{ league.name }}</h3>
-    <p class="meta">{{ league.member_count }} managers in league</p>
-    <a href="{{ url_for('league', league_id=league.id) }}" class="btn btn-black" style="margin-top:10px">View League</a>
-  </div>
-  {% endfor %}
+  <div class="card player-card">
+    <h3>{{ league.name }}</h3>
+    <p class="meta">
+      {% if league.is_private %}
+        🔒 Private League
+      {% else %}
+        🌍 Public League
+      {% endif %}
+    </p>
+    <p class="meta">{{ league.member_count }} managers</p>
+
+    <a href="{{ url_for('league', league_id=league.id) }}" class="btn btn-black">View League</a>
+
+    {% if session.email == "your@email.com" %}
+      <form method="post" action="{{ url_for('reset_league_password', league_id=league.id) }}">
+        <input type="password" name="password" placeholder="New password" required>
+        <button type="submit" class="btn btn-danger">Reset Password</button>
+      </form>
+    {% endif %}
   </div>
   <div style="margin-top:20px; text-align:center">
   <a href="{{ url_for('create_league') }}" class="btn btn-secondary">Create League</a>
