@@ -1159,8 +1159,6 @@ def finalize_gw(league_id):
     flash(f'Finalized GW {selected_gw} results for {g.league["name"]}.', 'success')
     return redirect(url_for('league', league_id=league_id, gw=selected_gw))
 
-from werkzeug.security import generate_password_hash
-
 @app.route("/admin/reset_league_password/<int:league_id>", methods=["POST"])
 def reset_league_password(league_id):
     # ⚠️ restrict this route to you only
