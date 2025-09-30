@@ -628,18 +628,25 @@ def create_league():
     if 'user_id' not in session:
         return redirect(url_for('login'))
 
-    if request.method == "POST":
-    name = request.form.get("name")
-    is_private = bool(request.form.get("is_private"))
-    password = request.form.get("password") if is_private else None
+    if request.method == 'POST':
+        name = request.form.get("name")
+        is_private = bool(request.form.get("is_private"))
+        password = request.form.get("password") if is_private else None
+        uid = session['user_id']
 
-    pw_hash = generate_password_hash(password) if password else None
+        if not name:
+            flash("League name required", "danger")
+            return redirect(url_for('create_league'))
 
-    cur.execute("""
-        INSERT INTO leagues (name, created_by, is_private, password_hash)
-        VALUES (%s, %s, %s, %s)
-        RETURNING id
-    """, (name, uid, is_private, pw_hash))
+        pw_hash = generate_password_hash(password) if password else None
+
+        conn = db(); cur = conn.cursor()
+        cur.execute("""
+            INSERT INTO leagues (name, created_by, is_private, password_hash)
+            VALUES (%s, %s, %s, %s)
+            RETURNING id
+        """, (name, uid, is_private, pw_hash))
+        league_id = cur.fetchone()[0]
 
         cur.execute("""
             INSERT INTO league_members (league_id, user_id)
@@ -652,7 +659,7 @@ def create_league():
         return redirect(url_for('league', league_id=league_id))
 
     return render_template("create_league.html", title="Create League")
-
+    
 @app.route('/fbj/join_league', methods=['GET', 'POST'])
 def join_league():
     if 'user_id' not in session:
