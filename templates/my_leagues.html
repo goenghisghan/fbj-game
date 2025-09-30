@@ -3,34 +3,41 @@
 <div class="center" style="flex-direction:column;text-align:center">
   <img src="{{ url_for('static', filename='fantasy_blackjack_badge_padded.png') }}" alt="FBJ logo" style="max-width:260px;margin:5px auto;">
   <p class="subtitle">👇Scroll down for rules</p>
+  
   <h2>My Leagues</h2>
   <div class="grid grid-home">
-  {% for league in leagues %}
-  <div class="card player-card">
-    <h3>{{ league.name }}</h3>
-    <p class="meta">
-      {% if league.is_private %}
-        🔒 Private League
-      {% else %}
-        🌍 Public League
-      {% endif %}
-    </p>
-    <p class="meta">{{ league.member_count }} managers</p>
+    {% for league in leagues %}
+      <div class="card player-card">
+        <h3>{{ league.name }}</h3>
+        <p class="meta">
+          {% if league.is_private %}
+            🔒 Private League
+          {% else %}
+            🌍 Public League
+          {% endif %}
+        </p>
+        <p class="meta">{{ league.member_count }} managers</p>
 
-    <a href="{{ url_for('league', league_id=league.id) }}" class="btn btn-black">View League</a>
+        <a href="{{ url_for('league', league_id=league.id) }}" class="btn btn-black">View League</a>
 
-    {% if session.email == "your@email.com" %}
-      <form method="post" action="{{ url_for('reset_league_password', league_id=league.id) }}">
-        <input type="password" name="password" placeholder="New password" required>
-        <button type="submit" class="btn btn-danger">Reset Password</button>
-      </form>
-    {% endif %}
+        {% if session.email == "your@email.com" %}
+          <form method="post" action="{{ url_for('reset_league_password', league_id=league.id) }}">
+            <input type="password" name="password" placeholder="New password" required>
+            <button type="submit" class="btn btn-danger">Reset Password</button>
+          </form>
+        {% endif %}
+      </div>
+    {% endfor %}
   </div>
+
+  <!-- Actions under the league grid -->
   <div style="margin-top:20px; text-align:center">
-  <a href="{{ url_for('create_league') }}" class="btn btn-secondary">Create League</a>
-  <a href="{{ url_for('join_league') }}" class="btn">Join League</a>
+    <a href="{{ url_for('create_league') }}" class="btn btn-secondary">Create League</a>
+    <a href="{{ url_for('join_league') }}" class="btn">Join League</a>
   </div>
-  <div class="quick-rules card">
+
+  <!-- Quick rules -->
+  <div class="quick-rules card" style="margin-top:20px;">
     <h2>⚡ Quick Rules</h2>
     <ul>
       <li><strong>Pick 4 players</strong> each gameweek: 1 GK, 1 DEF, 1 MID, 1 FWD (max 1 per club).</li>
@@ -43,11 +50,5 @@
     </ul>
     <a class="btn btn-red" href="{{ url_for('rules') }}">📜 Full rules</a>
   </div>
-  {% if session.email == "joechrisp@hotmail.co.uk" %}
-  <form method="post" action="{{ url_for('reset_league_password', league_id=league.id) }}">
-    <input type="password" name="password" placeholder="New password">
-    <button type="submit" class="btn btn-danger">Reset Password</button>
-  </form>
-{% endif %}
 </div>
 {% endblock %}
