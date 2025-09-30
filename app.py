@@ -776,7 +776,7 @@ def live(league_id):
             }
 
     league_lineups, gw_id_all = get_gw_lineup_for_users(events, data, league_id)
-     league_lineups.sort(key=lambda u: u["total"], reverse=True)
+    league_lineups.sort(key=lambda u: u["total"], reverse=True)
 
     return render_template(
         'live.html',
