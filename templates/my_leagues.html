@@ -20,7 +20,7 @@
 
         <a href="{{ url_for('league', league_id=league.id) }}" class="btn btn-black">View League</a>
 
-        {% if session.email == "joechrisp@hotmail.co.uk" %}
+        {% if session.email == "joechrisp1@gmail.com" %}
           <form method="post" action="{{ url_for('reset_league_password', league_id=league.id) }}">
             <input type="password" name="password" placeholder="New password" required>
             <button type="submit" class="btn btn-danger">Reset Password</button>
