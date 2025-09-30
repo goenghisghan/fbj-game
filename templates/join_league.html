@@ -1,18 +1,43 @@
 {% extends "base.html" %}
 {% block content %}
-<h2>Join a League</h2>
-<div class="grid">
-  {% for league in leagues %}
-  <div class="card player-card" style="text-align:center">
-    <h3 style="margin:6px 0">{{ league.name }}</h3>
-    <p class="meta">Created by {{ league.creator }}</p>
-    <form method="POST" style="margin-top:10px">
-      <input type="hidden" name="league_id" value="{{ league.id }}">
-      <button type="submit" class="btn">Join</button>
-    </form>
-  </div>
+<div class="card auth-card">
+  <h2>Join a League</h2>
+
+  {% if leagues %}
+    <div class="grid">
+      {% for league in leagues %}
+        <div class="card player-card" style="text-align:center; padding:16px;">
+
+          <h3 style="margin:6px 0;">{{ league.name }}</h3>
+          <p class="meta">
+            {% if league.is_private %}
+              🔒 Private League
+            {% else %}
+              🌍 Public League
+            {% endif %}
+          </p>
+          <p class="meta">{{ league.member_count }} managers</p>
+
+          <form method="post" style="margin-top:10px;">
+            <input type="hidden" name="league_id" value="{{ league.id }}">
+            
+            {% if league.is_private %}
+              <input type="password" 
+                     name="password" 
+                     placeholder="Enter password"
+                     required
+                     style="margin-bottom:8px; width:100%;">
+            {% endif %}
+            
+            <button type="submit" class="btn btn-black">
+              Join League
+            </button>
+          </form>
+        </div>
+      {% endfor %}
+    </div>
   {% else %}
-  <p class="meta">No leagues available to join.</p>
-  {% endfor %}
+    <p>No leagues available to join at the moment.</p>
+  {% endif %}
 </div>
 {% endblock %}
