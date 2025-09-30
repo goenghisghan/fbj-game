@@ -1159,6 +1159,32 @@ def finalize_gw(league_id):
     flash(f'Finalized GW {selected_gw} results for {g.league["name"]}.', 'success')
     return redirect(url_for('league', league_id=league_id, gw=selected_gw))
 
+from werkzeug.security import generate_password_hash
+
+@app.route("/admin/reset_league_password/<int:league_id>", methods=["POST"])
+def reset_league_password(league_id):
+    # ⚠️ restrict this route to you only
+    if 'user_id' not in session or session['email'] != "joechrisp@hotmail.co.uk":
+        abort(403)
+
+    new_pw = request.form.get("password")
+    if not new_pw:
+        flash("Password required", "danger")
+        return redirect(url_for("my_leagues"))
+
+    hash_pw = generate_password_hash(new_pw)
+
+    conn = db(); cur = conn.cursor()
+    cur.execute("""
+        UPDATE leagues
+        SET is_private = TRUE, password_hash = %s
+        WHERE id = %s
+    """, (hash_pw, league_id))
+    conn.commit(); conn.close()
+
+    flash(f"League {league_id} password reset successfully.", "success")
+    return redirect(url_for("my_leagues"))
+
 @app.route("/draft_pyramid")
 def draft_pyramid_home():
     if "user_id" not in session:
