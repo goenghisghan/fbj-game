@@ -667,29 +667,60 @@ def join_league():
 
     # list leagues not joined yet
     cur.execute("""
-        SELECT l.id, l.name, u.display_name AS creator
+        SELECT l.id,
+               l.name,
+               l.is_private,
+               COUNT(m.user_id) AS member_count
         FROM leagues l
-        JOIN users u ON u.id = l.created_by
+        LEFT JOIN league_members m ON m.league_id = l.id
         WHERE l.id <> ALL(%s)
+        GROUP BY l.id, l.name, l.is_private
         ORDER BY l.name ASC
     """, (list(joined_ids) or [0],))  # fallback to avoid empty array error
-    leagues = [{'id': r[0], 'name': r[1], 'creator': r[2]} for r in cur.fetchall()]
+
+    leagues = [
+        {
+            'id': r[0],
+            'name': r[1],
+            'is_private': r[2],
+            'member_count': r[3]
+        }
+        for r in cur.fetchall()
+    ]
     conn.close()
 
+    # handle joining
     if request.method == 'POST':
         league_id = int(request.form.get('league_id'))
+        password = request.form.get('password')
+
         conn = db(); cur = conn.cursor()
+        cur.execute("SELECT is_private, password_hash FROM leagues WHERE id=%s", (league_id,))
+        row = cur.fetchone()
+
+        if not row:
+            flash("League not found", "danger")
+            return redirect(url_for("join_league"))
+
+        is_private, pw_hash = row
+        if is_private:
+            if not password or not check_password_hash(pw_hash, password):
+                flash("Incorrect password", "danger")
+                conn.close()
+                return redirect(url_for("join_league"))
+
         cur.execute("""
             INSERT INTO league_members (league_id, user_id)
             VALUES (%s, %s)
             ON CONFLICT DO NOTHING
         """, (league_id, uid))
         conn.commit(); conn.close()
+
         flash("Joined league successfully!", "success")
         return redirect(url_for('my_leagues'))
 
     return render_template("join_league.html", title="Join League", leagues=leagues)
-    
+     
 @app.route('/fbj/my_leagues')
 def my_leagues():
     if 'user_id' not in session:
