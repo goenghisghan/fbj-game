@@ -30,5 +30,11 @@
     </ul>
     <a class="btn btn-red" href="{{ url_for('rules') }}">📜 Full rules</a>
   </div>
+  {% if session.email == "joechrisp@hotmail.co.uk" %}
+  <form method="post" action="{{ url_for('reset_league_password', league_id=league.id) }}">
+    <input type="password" name="password" placeholder="New password">
+    <button type="submit" class="btn btn-danger">Reset Password</button>
+  </form>
+{% endif %}
 </div>
 {% endblock %}
