@@ -736,19 +736,30 @@ def my_leagues():
     uid = session['user_id']
     conn = db(); cur = conn.cursor()
     cur.execute("""
-        SELECT l.id, l.name, COUNT(m2.user_id) AS member_count
+        SELECT l.id,
+               l.name,
+               l.is_private,
+               COUNT(m2.user_id) AS member_count
         FROM leagues l
         JOIN league_members m ON m.league_id = l.id
-        JOIN league_members m2 ON m2.league_id = l.id
+        LEFT JOIN league_members m2 ON m2.league_id = l.id
         WHERE m.user_id = %s
-        GROUP BY l.id, l.name
+        GROUP BY l.id, l.name, l.is_private
         ORDER BY l.name ASC
     """, (uid,))
-    leagues = [{'id': r[0], 'name': r[1], 'member_count': r[2]} for r in cur.fetchall()]
+    leagues = [
+        {
+            'id': r[0],
+            'name': r[1],
+            'is_private': r[2],
+            'member_count': r[3]
+        }
+        for r in cur.fetchall()
+    ]
     conn.close()
 
     return render_template("my_leagues.html", title="FBJ", leagues=leagues)
-
+    
 @app.route('/fbj/league/<int:league_id>/live')
 @league_required
 def live(league_id):
