@@ -628,20 +628,18 @@ def create_league():
     if 'user_id' not in session:
         return redirect(url_for('login'))
 
-    if request.method == 'POST':
-        name = request.form.get('name')
-        uid = session['user_id']
-        if not name:
-            flash("League name required", "danger")
-            return redirect(url_for('create_league'))
+    if request.method == "POST":
+    name = request.form.get("name")
+    is_private = bool(request.form.get("is_private"))
+    password = request.form.get("password") if is_private else None
 
-        conn = db(); cur = conn.cursor()
-        cur.execute("""
-            INSERT INTO leagues (name, created_by)
-            VALUES (%s, %s)
-            RETURNING id
-        """, (name, uid))
-        league_id = cur.fetchone()[0]
+    pw_hash = generate_password_hash(password) if password else None
+
+    cur.execute("""
+        INSERT INTO leagues (name, created_by, is_private, password_hash)
+        VALUES (%s, %s, %s, %s)
+        RETURNING id
+    """, (name, uid, is_private, pw_hash))
 
         cur.execute("""
             INSERT INTO league_members (league_id, user_id)
