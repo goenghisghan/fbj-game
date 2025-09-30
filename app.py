@@ -1211,7 +1211,7 @@ def finalize_gw(league_id):
 @app.route("/admin/reset_league_password/<int:league_id>", methods=["POST"])
 def reset_league_password(league_id):
     # ⚠️ restrict this route to you only
-    if 'user_id' not in session or session['email'] != "joechrisp@hotmail.co.uk":
+    if 'user_id' not in session or session['email'] != "joechrisp1@gmail.com":
         abort(403)
 
     new_pw = request.form.get("password")
