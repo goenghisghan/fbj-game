@@ -3,10 +3,27 @@
 <div class="card auth-card">
   <h2>Create a League</h2>
   <form method="POST">
-    <label for="name">League Name</label>
-    <input type="text" id="name" name="name" class="input" placeholder="Enter league name" required>
+  <label>League Name
+    <input type="text" name="name" required>
+  </label>
 
-    <button type="submit" class="btn" style="margin-top:12px">Create</button>
-  </form>
-</div>
+  <label>
+    <input type="checkbox" name="is_private" value="1" onchange="togglePassword(this)">
+    Private League
+  </label>
+
+  <div id="passwordField" style="display:none;">
+    <label>Password
+      <input type="password" name="password">
+    </label>
+  </div>
+
+  <button type="submit" class="btn">Create League</button>
+</form>
+
+<script>
+function togglePassword(checkbox) {
+  document.getElementById("passwordField").style.display = checkbox.checked ? "block" : "none";
+}
+</script>
 {% endblock %}
