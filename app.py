@@ -1184,30 +1184,44 @@ def finalize_gw(league_id):
     if 'user_id' not in session:
         return redirect(url_for('login'))
 
+    # Load bootstrap data
     data, teams, positions, events = bootstrap()
-    sel_gw = request.args.get('gw', type=int) or request.form.get('gw', type=int)
+
+    # Which GW are we finalizing?
+    sel_gw = request.args.get('gw', type=int)
     cur_ev = next((e for e in events if e.get('is_current')), None)
     nxt_ev = next((e for e in events if e.get('is_next')), None)
-    selected_gw = sel_gw or (cur_ev['id'] if cur_ev else (nxt_ev['id'] if nxt_ev else 1))
+    default_gw = cur_ev['id'] if cur_ev else (nxt_ev['id'] if nxt_ev else 1)
+    selected_gw = sel_gw or default_gw
 
+    # Get league users
     users = league_users(league_id)
 
-    conn = db(); cur = conn.cursor()
+    # Build records for batch insert
+    records = []
     for u in users:
         gwp = gw_stats_for_user(u['id'], selected_gw, league_id)
         lp = league_points_from_total(gwp)
-        cur.execute("""
-            INSERT INTO results (user_id, league_id, gameweek_id, gw_points, league_points)
-            VALUES (%s, %s, %s, %s, %s)
-            ON CONFLICT (user_id, league_id, gameweek_id)
-            DO UPDATE SET gw_points = EXCLUDED.gw_points,
-                          league_points = EXCLUDED.league_points
-        """, (u['id'], league_id, selected_gw, gwp, lp))
+        records.append((u['id'], league_id, selected_gw, gwp, lp))
+
+    if not records:
+        flash("No users in league to finalize.", "warning")
+        return redirect(url_for('league', league_id=league_id))
+
+    # Insert or update results in one batch
+    conn = db(); cur = conn.cursor()
+    cur.executemany("""
+        INSERT INTO results (user_id, league_id, gameweek_id, gw_points, league_points)
+        VALUES (%s, %s, %s, %s, %s)
+        ON CONFLICT (user_id, league_id, gameweek_id)
+        DO UPDATE SET gw_points = EXCLUDED.gw_points,
+                      league_points = EXCLUDED.league_points
+    """, records)
     conn.commit(); conn.close()
 
-    flash(f'Finalized GW {selected_gw} results for {g.league["name"]}.', 'success')
+    flash(f"Gameweek {selected_gw} finalized for {len(records)} managers.", "success")
     return redirect(url_for('league', league_id=league_id, gw=selected_gw))
-
+    
 @app.route("/admin/reset_league_password/<int:league_id>", methods=["POST"])
 def reset_league_password(league_id):
     # ⚠️ restrict this route to you only
