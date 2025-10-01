@@ -763,103 +763,40 @@ def my_leagues():
 @app.route('/fbj/league/<int:league_id>/live')
 @league_required
 def live(league_id):
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
-
     uid = session['user_id']
     display_name = get_display_name(uid)
 
-    # Bootstrap data (cached if possible)
     data, teams, positions, events = bootstrap()
-    team_map = {t['id']: t for t in data['teams']}
-    player_map = {p['id']: p for p in data['elements']}
-
-    # Get current GW and check deadline
     locked, gw_id = get_locked_picks_league(uid, league_id, events)
 
-    # --- Batch fetch all picks for this league + GW ---
-    conn = db(); cur = conn.cursor()
-    cur.execute("""
-        SELECT user_id, position, player_id
-        FROM picks
-        WHERE league_id = %s AND gameweek_id = %s
-    """, (league_id, gw_id))
-    pick_rows = cur.fetchall()
-
-    # Organize picks per user
-    from collections import defaultdict
-    picks_by_user = defaultdict(dict)
-    for user_id, pos, pid in pick_rows:
-        picks_by_user[user_id][pos] = pid
-
-    # --- Batch fetch all player stats for this GW ---
-    cur.execute("""
-        SELECT player_id, total_points, minutes, saves, goals_conceded,
-               assists, goals_scored, bonus, defensive_contribution,
-               yellow_cards, red_cards, penalties_missed, own_goals
-        FROM player_stats
-        WHERE gameweek_id = %s
-    """, (gw_id,))
-    stat_rows = cur.fetchall()
-    stats_map = {
-        r[0]: {
-            'total_points': r[1], 'minutes': r[2], 'saves': r[3], 'goals_conceded': r[4],
-            'assists': r[5], 'goals_scored': r[6], 'bonus': r[7], 'def_contrib': r[8],
-            'yellow_cards': r[9], 'red_cards': r[10], 'penalties_missed': r[11], 'own_goals': r[12]
-        }
-        for r in stat_rows
-    }
-
-    # --- Batch compute pick counts & valid teams ---
-    cur.execute("""
-        SELECT player_id, COUNT(*)::int
-        FROM picks
-        WHERE league_id = %s AND gameweek_id = %s
-        GROUP BY player_id
-    """, (league_id, gw_id))
-    pick_counts = {row[0]: row[1] for row in cur.fetchall()}
-
-    cur.execute("""
-        SELECT COUNT(*)::int
-        FROM (
-          SELECT user_id
-          FROM picks
-          WHERE league_id = %s AND gameweek_id = %s
-          GROUP BY user_id
-          HAVING COUNT(*) = 4
-        ) t
-    """, (league_id, gw_id))
-    total_users = cur.fetchone()[0] or 0
-
-    conn.close()
-
-    # Rule text (same for all players in league)
-    rule_text = league_penalty_rule(total_users)
-
-    # --- Compute squad for current user ---
-    picks = {'GK': None, 'DEF': None, 'MID': None, 'FWD': None}
     total_points = 0
+    picks = {'GK': None, 'DEF': None, 'MID': None, 'FWD': None}
 
     if locked and gw_id:
+        team_map = {t['id']: t for t in data['teams']}
+        player_map = {p['id']: p for p in data['elements']}
+        pick_counts = get_player_pick_counts(gw_id, league_id)
+        total_users = get_valid_user_count(gw_id, league_id)
+        rule_text = league_penalty_rule(total_users)
+
         for pos in picks.keys():
             pid = locked.get(pos)
             if not pid:
                 continue
-
             p = player_map.get(pid)
             if not p:
                 continue
 
             photo_id = p.get('photo', '').split('.')[0]
             photo_url = f'https://resources.premierleague.com/premierleague25/photos/players/110x140/{photo_id}.png'
-            hist = stats_map.get(pid, {})
+            hist = gw_stats_for_player(pid, gw_id) or {}
             base_pts = hist.get('total_points', 0)
 
             count = pick_counts.get(pid, 1)
             penalty = calc_penalty(count, total_users)
             gw_pts = base_pts - penalty
-            total_points += gw_pts
 
+            total_points += gw_pts
             picks[pos] = {
                 'name': f"{p.get('first_name','')} {p.get('second_name','')}".strip(),
                 'team_name': teams[p['team']]['name'],
@@ -869,40 +806,24 @@ def live(league_id):
                 'penalty': penalty,
                 'pick_count': count,
                 'rule_text': rule_text,
-                'stats': hist
+                'stats': ({
+                    'position': positions[p['element_type']],
+                    'minutes': hist.get('minutes', 0),
+                    'saves': hist.get('saves', 0),
+                    'goals_conceded': hist.get('goals_conceded', 0),
+                    'assists': hist.get('assists', 0),
+                    'goals_scored': hist.get('goals_scored', 0),
+                    'bonus': hist.get('bonus', 0),
+                    'def_contrib': hist.get('defensive_contribution', 0),
+                    'yellow_cards': hist.get('yellow_cards', 0),
+                    'red_cards': hist.get('red_cards', 0),
+                    'penalties_missed': hist.get('penalties_missed', 0),
+                    'own_goals': hist.get('own_goals', 0),
+                } if hist else None)
             }
 
-    # --- Build lineups for all users in league (using pre-fetched picks/stats) ---
-    league_lineups = []
-    for user_id, posmap in picks_by_user.items():
-        lineup = {}
-        total = 0
-        for pos, pid in posmap.items():
-            p = player_map.get(pid)
-            if not p:
-                continue
-
-            hist = stats_map.get(pid, {})
-            base_pts = hist.get('total_points', 0)
-            count = pick_counts.get(pid, 1)
-            penalty = calc_penalty(count, total_users)
-            gw_pts = base_pts - penalty
-            total += gw_pts
-
-            lineup[pos] = {
-                'name': f"{p.get('first_name','')} {p.get('second_name','')}".strip(),
-                'team_name': teams[p['team']]['name'],
-                'gw_points': gw_pts,
-                'penalty': penalty
-            }
-        league_lineups.append({
-            'user': get_display_name(user_id),
-            'lineup': lineup,
-            'total_points': total
-        })
-
-    # Sort lineups by points
-    league_lineups.sort(key=lambda r: r['total_points'], reverse=True)
+    league_lineups, gw_id_all = get_gw_lineup_for_users(events, data, league_id)
+    league_lineups.sort(key=lambda u: u["total"], reverse=True)
 
     return render_template(
         'live.html',
@@ -911,8 +832,8 @@ def live(league_id):
         total_points=total_points,
         squad=picks,
         league_lineups=league_lineups,
-        gw_id_all=gw_id,
-        league_id=league_id,
+        gw_id_all=gw_id_all,
+        league_id=league_id,      # 🔑 pass to template for nav links
         league_name=g.league['name']
     )
     
