@@ -1078,29 +1078,8 @@ def league(league_id):
     if 'user_id' not in session:
         return redirect(url_for('login'))
 
+    # Bootstrap FPL data
     data, teams, positions, events = bootstrap()
-    users = league_users(league_id)  # ✅ only members of this league
-
-    conn = db(); cur = conn.cursor()
-
-    # --- League standings (total LP + avg GW) ---
-    cur.execute("""
-        SELECT u.id, u.display_name,
-               COALESCE(SUM(r.league_points), 0) AS total_lp,
-               CASE WHEN COUNT(r.gw_points) > 0
-                    THEN AVG(CASE WHEN r.gw_points BETWEEN 0 AND 21 THEN r.gw_points ELSE 0 END)
-                    ELSE 0 END AS avg_gw
-        FROM users u
-        JOIN league_members m ON m.user_id = u.id
-        LEFT JOIN results r ON r.user_id = u.id AND r.league_id = %s
-        WHERE m.league_id = %s
-        GROUP BY u.id, u.display_name
-        ORDER BY total_lp DESC, avg_gw DESC, u.display_name ASC
-    """, (league_id, league_id))
-    league_rows = [
-        {'user_id': r[0], 'username': r[1], 'total_lp': int(r[2]), 'avg_gw': float(r[3])}
-        for r in cur.fetchall()
-    ]
 
     # --- Pick GW ---
     sel_gw = request.args.get('gw', type=int)
@@ -1109,7 +1088,22 @@ def league(league_id):
     default_gw = cur_ev['id'] if cur_ev else (nxt_ev['id'] if nxt_ev else 1)
     selected_gw = sel_gw or default_gw
 
-    # --- Batch fetch results for this GW ---
+    conn = db(); cur = conn.cursor()
+
+    # --- League standings (from precomputed table) ---
+    cur.execute("""
+        SELECT u.display_name, s.total_lp, s.avg_gw
+        FROM league_standings s
+        JOIN users u ON u.id = s.user_id
+        WHERE s.league_id = %s
+        ORDER BY s.total_lp DESC, s.avg_gw DESC, u.display_name ASC
+    """, (league_id,))
+    league_rows = [
+        {'username': r[0], 'total_lp': int(r[1]), 'avg_gw': float(r[2])}
+        for r in cur.fetchall()
+    ]
+
+    # --- Results for this GW ---
     cur.execute("""
         SELECT user_id, gw_points, league_points
         FROM results
@@ -1117,38 +1111,19 @@ def league(league_id):
     """, (selected_gw, league_id))
     resmap = {row[0]: {'gw_points': row[1], 'league_points': row[2]} for row in cur.fetchall()}
 
-    # --- Batch fetch picks for all users (only if needed) ---
-    missing_ids = [u['id'] for u in users if u['id'] not in resmap]
-    picks_by_user = {}
-    if missing_ids:
-        cur.execute("""
-            SELECT user_id, position, player_id
-            FROM picks
-            WHERE league_id=%s AND gameweek_id=%s
-              AND user_id = ANY(%s)
-        """, (league_id, selected_gw, missing_ids))
-        rows = cur.fetchall()
-        from collections import defaultdict
-        picks_by_user = defaultdict(dict)
-        for uid, pos, pid in rows:
-            picks_by_user[uid][pos] = pid
-
     conn.close()
 
-    # --- Build history rows ---
+    # --- Build GW history rows ---
+    users = league_users(league_id)  # still need member list for display
     history_rows = []
     for u in users:
         if u['id'] in resmap:
             gwp = resmap[u['id']]['gw_points']
             lp = resmap[u['id']]['league_points']
         else:
-            # Only calculate if absolutely missing
-            user_picks = picks_by_user.get(u['id'], {})
-            if not user_picks:
-                gwp, lp = 0, 0
-            else:
-                gwp = gw_stats_for_user(u['id'], selected_gw, league_id)
-                lp = league_points_from_total(gwp)
+            # If no results, fallback (only happens if GW not finalized)
+            gwp = gw_stats_for_user(u['id'], selected_gw, league_id)
+            lp = league_points_from_total(gwp)
         display_points = f"{gwp}" if gwp <= 21 else f"Bust ({gwp})"
         history_rows.append({
             'username': u['display_name'],
@@ -1165,6 +1140,7 @@ def league(league_id):
     can_finalize = bool(relevant) and all(f.get('finished') for f in relevant)
 
     all_gws = [{'id': e['id']} for e in events]
+
     return render_template(
         'league.html',
         title=f'League & History – {g.league["name"]}',
@@ -1176,7 +1152,6 @@ def league(league_id):
         league_id=league_id,
         league_name=g.league['name']
     )
-
 
 @app.route('/fbj/league/<int:league_id>/finalize_gw', methods=['POST'])
 @league_required
