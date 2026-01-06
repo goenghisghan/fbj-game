@@ -680,7 +680,7 @@ def reset_password(user_id, token):
     token_hash, expires = row
 
     # Check expiry + token
-    now = utcnow()
+    now = datetime.now(timezone.utc)
     if (not token_hash) or (not expires) or (expires.replace(tzinfo=timezone.utc) < now) or (not check_password_hash(token_hash, token)):
         conn.close()
         flash("That reset link is invalid or has expired.", "danger")
