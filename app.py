@@ -94,7 +94,9 @@ def init_db():
             is_confirmed BOOLEAN DEFAULT FALSE,
             confirmation_token TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            display_name TEXT NOT NULL
+            display_name TEXT NOT NULL,
+            reset_token_hash TEXT,
+            reset_token_expires TIMESTAMP
         );
     """)
 
@@ -196,6 +198,33 @@ def user_leagues(user_id):
     """, (user_id,))
     rows = cur.fetchall(); conn.close()
     return [{"id": r[0], "name": r[1]} for r in rows]
+
+def create_password_reset(user_id: int, email: str, first_name: str):
+    token = secrets.token_urlsafe(32)
+    token_hash = generate_password_hash(token)
+    expires = datetime.now(timezone.utc) + timedelta(hours=1)
+
+    conn = db(); cur = conn.cursor()
+    cur.execute("""
+        UPDATE users
+        SET reset_token_hash=%s, reset_token_expires=%s
+        WHERE id=%s
+    """, (token_hash, expires, user_id))
+    conn.commit()
+    conn.close()
+
+    reset_link = url_for("reset_password", user_id=user_id, token=token, _external=True)
+
+    send_email(
+        email,
+        "Reset your FBJ Game password",
+        f"""
+        <p>Hi {first_name},</p>
+        <p>You requested a password reset. Click the link below to set a new password (valid for 1 hour):</p>
+        <p><a href="{reset_link}">Reset my password</a></p>
+        <p>If you didn’t request this, you can ignore this email.</p>
+        """
+    )
 
 # Decorator to enforce membership and load league
 def league_required(view):
@@ -609,10 +638,87 @@ def login():
 
     return render_template("login.html", title="Login")
 
-@app.route('/reset_request')
+@app.route("/reset_request", methods=["GET", "POST"])
 def reset_request():
-    flash("Password reset not implemented yet.", "info")
-    return redirect(url_for('login'))
+    if request.method == "POST":
+        email = request.form["email"].strip().lower()
+
+        # Always respond the same way (prevents account enumeration)
+        flash("If an account exists for that email, you’ll receive a password reset link shortly.", "info")
+
+        if email:
+            conn = db(); cur = conn.cursor()
+            cur.execute("SELECT id, first_name, is_confirmed FROM users WHERE email=%s", (email,))
+            row = cur.fetchone()
+            conn.close()
+
+            if row:
+                user_id, first_name, is_confirmed = row
+                # Optional: only allow reset if confirmed
+                if is_confirmed:
+                    create_password_reset(user_id, email, first_name)
+
+        return redirect(url_for("login"))
+
+    return render_template("reset_request.html", title="Reset password")
+
+@app.route("/reset/<int:user_id>/<token>", methods=["GET", "POST"])
+def reset_password(user_id, token):
+    conn = db(); cur = conn.cursor()
+    cur.execute("""
+        SELECT reset_token_hash, reset_token_expires
+        FROM users
+        WHERE id=%s
+    """, (user_id,))
+    row = cur.fetchone()
+
+    if not row:
+        conn.close()
+        flash("That reset link is invalid or has expired.", "danger")
+        return redirect(url_for("login"))
+
+    token_hash, expires = row
+
+    # Check expiry + token
+    now = utcnow()
+    if (not token_hash) or (not expires) or (expires.replace(tzinfo=timezone.utc) < now) or (not check_password_hash(token_hash, token)):
+        conn.close()
+        flash("That reset link is invalid or has expired.", "danger")
+        return redirect(url_for("login"))
+
+    if request.method == "POST":
+        password = request.form["password"]
+        password2 = request.form["password2"]
+
+        if not password or len(password) < 8:
+            conn.close()
+            flash("Password must be at least 8 characters.", "warning")
+            return render_template("reset_password.html", title="Set new password")
+
+        if password != password2:
+            conn.close()
+            flash("Passwords do not match.", "warning")
+            return render_template("reset_password.html", title="Set new password")
+
+        new_hash = generate_password_hash(password)
+
+        # Update password and invalidate token (single-use)
+        cur.execute("""
+            UPDATE users
+            SET password=%s,
+                reset_token_hash=NULL,
+                reset_token_expires=NULL
+            WHERE id=%s
+        """, (new_hash, user_id))
+        conn.commit()
+        conn.close()
+
+        flash("✅ Your password has been updated. Please log in.", "success")
+        return redirect(url_for("login"))
+
+    conn.close()
+    return render_template("reset_password.html", title="Set new password")
+
 
 @app.route('/logout')
 def logout():
