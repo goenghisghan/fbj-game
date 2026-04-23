@@ -105,8 +105,14 @@ jobs:
               print(f"⚠️ Skipping update, invalid JSON: {e}")
               sys.exit(0)
 
+          import time
           payload = {"files": {"fpl_stats.json": {"content": json.dumps(stats, indent=2)}}}
-          resp = requests.patch(gist_url, headers=gh_headers, json=payload, timeout=60)
+          for attempt in range(4):
+              resp = requests.patch(gist_url, headers=gh_headers, json=payload, timeout=60)
+              if resp.status_code < 500:
+                  break
+              print(f"⚠️ Gist update got {resp.status_code}, retrying in {2 ** attempt}s...")
+              time.sleep(2 ** attempt)
           resp.raise_for_status()
           print(f"✅ Updated bootstrap + GW {gw_id} stats")
           EOF
