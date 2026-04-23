@@ -77,6 +77,7 @@ jobs:
           # Normalise into stats[gw][player_id] as a list of per-fixture dicts,
           # matching the format used by the seed action (element-summary history).
           # explain[] has one entry per fixture with individual stat values.
+          # total_points per fixture is derived by summing explain stat points.
           def build_fixture_stats(player):
               explain = player.get("explain", [])
               if not explain:
@@ -84,10 +85,13 @@ jobs:
               result = []
               for entry in explain:
                   per_fixture = {"fixture": entry.get("fixture")}
+                  fixture_pts = 0
                   for stat in entry.get("stats", []):
                       identifier = stat.get("identifier")
                       if identifier:
                           per_fixture[identifier] = stat.get("value", 0)
+                          fixture_pts += stat.get("points", 0)
+                  per_fixture["total_points"] = fixture_pts
                   result.append(per_fixture)
               return result
 
