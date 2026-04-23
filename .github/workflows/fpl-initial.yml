@@ -52,7 +52,7 @@ jobs:
               for h in summ.get("history", []):
                   gw = h["round"]
                   if gw in finished_gws:
-                      stats.setdefault(str(gw), {})[str(pid)] = h
+                      stats.setdefault(str(gw), {}).setdefault(str(pid), []).append(h)
               if i % 50 == 0:
                   print(f"Processed {i} players...")
 
