@@ -75,27 +75,27 @@ jobs:
               sys.exit(0)
 
           # Normalise into stats[gw][player_id] as a list of per-fixture dicts,
-# matching the format used by the seed action (element-summary history).
-# explain[] has one entry per fixture with individual stat values.
+          # matching the format used by the seed action (element-summary history).
+          # explain[] has one entry per fixture with individual stat values.
           def build_fixture_stats(player):
-               explain = player.get("explain", [])
-               if not explain:
+              explain = player.get("explain", [])
+              if not explain:
                   return [player.get("stats", {})]
-               result = []
-               for entry in explain:
+              result = []
+              for entry in explain:
                   per_fixture = {"fixture": entry.get("fixture")}
                   for stat in entry.get("stats", []):
-                     identifier = stat.get("identifier")
-                     if identifier:
-                       per_fixture[identifier] = stat.get("value", 0)
+                      identifier = stat.get("identifier")
+                      if identifier:
+                          per_fixture[identifier] = stat.get("value", 0)
                   result.append(per_fixture)
-               return result
+              return result
 
           stats.setdefault("stats", {})
           stats["stats"][str(gw_id)] = {
-             str(p["id"]): build_fixture_stats(p)
-             for p in live.get("elements", [])
-           }
+              str(p["id"]): build_fixture_stats(p)
+              for p in live.get("elements", [])
+          }
 
 
           # ---------------- Validate before writing ----------------
