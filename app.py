@@ -399,7 +399,16 @@ def decorate_players(players, teams, positions, opp_map):
 
 def gw_stats_for_player(player_id, gw_round):
     data = load_fpl_from_gist()
-    return data.get("stats", {}).get(str(gw_round), {}).get(str(player_id), {})
+    result = data.get("stats", {}).get(str(gw_round), {}).get(str(player_id), {})
+    if isinstance(result, list):
+        aggregated = {}
+        for entry in result:
+            if isinstance(entry, dict):
+                for k, v in entry.items():
+                    if k != "fixture" and isinstance(v, (int, float)):
+                        aggregated[k] = aggregated.get(k, 0) + v
+        return aggregated
+    return result if isinstance(result, dict) else {}
 
 def calc_penalty(n, total_users):
     """
