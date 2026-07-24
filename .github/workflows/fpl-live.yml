@@ -41,42 +41,6 @@ jobs:
               else:
                   return json.loads(file_info["content"])
 
-          # ---------------- Load existing stats ----------------
-          stats = load_gist_json(GIST_ID, gh_headers)
-
-          # ---------------- Fetch bootstrap ----------------
-          r = requests.get("https://fantasy.premierleague.com/api/bootstrap-static/", headers=headers, timeout=30)
-          if r.status_code != 200:
-              print("⚠️ Bootstrap fetch failed, skipping update")
-              sys.exit(0)
-          try:
-              bootstrap = r.json()
-          except Exception:
-              print("⚠️ Invalid JSON for bootstrap, skipping update")
-              sys.exit(0)
-          stats["bootstrap"] = bootstrap
-
-          # ---------------- Current GW ----------------
-          current_event = next((e for e in bootstrap["events"] if e.get("is_current")), None)
-          if not current_event:
-              print("⚠️ No current GW found, skipping update")
-              sys.exit(0)
-          gw_id = current_event["id"]
-
-          # ---------------- Fetch live GW stats ----------------
-          r = requests.get(f"https://fantasy.premierleague.com/api/event/{gw_id}/live/", headers=headers, timeout=30)
-          if r.status_code != 200:
-              print(f"⚠️ Live GW fetch failed ({r.status_code}), skipping update")
-              sys.exit(0)
-          try:
-              live = r.json()
-          except Exception:
-              print("⚠️ Invalid JSON for live GW, skipping update")
-              sys.exit(0)
-
-          # Normalise into stats[gw][player_id] as a list of per-fixture dicts,
-          # matching the format used by the seed action (element-summary history).
-          # explain[] has one entry per fixture with individual stat values.
           def build_fixture_stats(player):
               explain = player.get("explain", [])
               if not explain:
@@ -91,12 +55,46 @@ jobs:
                   result.append(per_fixture)
               return result
 
-          stats.setdefault("stats", {})
-          stats["stats"][str(gw_id)] = {
-              str(p["id"]): build_fixture_stats(p)
-              for p in live.get("elements", [])
-          }
+          # ---------------- Load existing stats ----------------
+          stats = load_gist_json(GIST_ID, gh_headers)
 
+          # ---------------- Fetch bootstrap ----------------
+          r = requests.get("https://fantasy.premierleague.com/api/bootstrap-static/", headers=headers, timeout=30)
+          if r.status_code != 200:
+              print(f"⚠️ Bootstrap fetch failed ({r.status_code}), skipping update")
+              sys.exit(0)
+          try:
+              bootstrap = r.json()
+          except Exception:
+              print("⚠️ Invalid JSON for bootstrap, skipping update")
+              sys.exit(0)
+
+          # Always stage the fresh bootstrap — this is what carries selected_by_percent,
+          # prices, news, etc. It must not be gated behind "is there a current GW",
+          # since during preseason/off-season there is no current GW at all and this
+          # data would otherwise never get written back to the gist.
+          stats["bootstrap"] = bootstrap
+
+          # ---------------- Current GW (optional — only needed for live stats) ----------------
+          current_event = next((e for e in bootstrap["events"] if e.get("is_current")), None)
+
+          if current_event:
+              gw_id = current_event["id"]
+              r = requests.get(f"https://fantasy.premierleague.com/api/event/{gw_id}/live/", headers=headers, timeout=30)
+              if r.status_code != 200:
+                  print(f"⚠️ Live GW fetch failed ({r.status_code}), keeping previous live stats")
+              else:
+                  try:
+                      live = r.json()
+                      stats.setdefault("stats", {})
+                      stats["stats"][str(gw_id)] = {
+                          str(p["id"]): build_fixture_stats(p)
+                          for p in live.get("elements", [])
+                      }
+                  except Exception:
+                      print("⚠️ Invalid JSON for live GW, keeping previous live stats")
+          else:
+              print("ℹ️ No current GW (preseason/off-season) — updating bootstrap only")
 
           # ---------------- Validate before writing ----------------
           try:
@@ -108,5 +106,9 @@ jobs:
           payload = {"files": {"fpl_stats.json": {"content": json.dumps(stats, indent=2)}}}
           resp = requests.patch(gist_url, headers=gh_headers, json=payload, timeout=60)
           resp.raise_for_status()
-          print(f"✅ Updated bootstrap + GW {gw_id} stats")
+
+          if current_event:
+              print(f"✅ Updated bootstrap + GW {gw_id} stats")
+          else:
+              print("✅ Updated bootstrap (no current GW)")
           EOF
