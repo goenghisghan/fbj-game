@@ -2,7 +2,7 @@ name: FPL Live Update
 
 on:
   schedule:
-    - cron: "7,22,37,52 * * * *"
+    - cron: "3,13,23,33,43,53 * * * *"
   workflow_dispatch:
 
 jobs:
