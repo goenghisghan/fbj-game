@@ -2,6 +2,13 @@ name: FPL Initial Seed
 
 on:
   workflow_dispatch:
+  schedule:
+    # Once a day — rebuilds every finished gameweek's stats from
+    # element-summary (the complete, correctly-per-fixture source, unlike
+    # the live endpoint's explain block) so anything fpl-live.yml had to
+    # approximate while a gameweek was in progress gets corrected once
+    # results are confirmed.
+    - cron: "0 4 * * *"
 
 jobs:
   seed:
@@ -20,6 +27,8 @@ jobs:
           import os, requests, json, sys
           GIST_ID, GIST_TOKEN = os.environ["GIST_ID"], os.environ["GIST_TOKEN"]
           headers = {"User-Agent": "Mozilla/5.0"}
+          gist_url = f"https://api.github.com/gists/{GIST_ID}"
+          gh_headers = {"Authorization": f"Bearer {GIST_TOKEN}"}
 
           def safe_get(url):
               r = requests.get(url, headers=headers, timeout=30)
@@ -32,6 +41,19 @@ jobs:
                   print(f"⚠️ Invalid JSON from {url}")
                   sys.exit(0)
 
+          def load_gist_json():
+              r = requests.get(gist_url, headers=gh_headers, timeout=30)
+              r.raise_for_status()
+              gist = r.json()
+              file_info = gist["files"].get("fpl_stats.json")
+              if not file_info:
+                  return {}
+              if file_info.get("truncated"):
+                  rr = requests.get(file_info["raw_url"], headers=gh_headers, timeout=60)
+                  rr.raise_for_status()
+                  return rr.json()
+              return json.loads(file_info["content"])
+
           # Fixtures
           fixtures = safe_get("https://fantasy.premierleague.com/api/fixtures/")
 
@@ -40,8 +62,13 @@ jobs:
           finished_gws = [e["id"] for e in bootstrap["events"] if e["finished"]]
           players = bootstrap["elements"]
 
-          # Collect past GW stats
-          stats = {}
+          # Collect stats for every finished GW, freshly rebuilt from
+          # element-summary each run (the complete, correctly-per-fixture
+          # source — see fpl-live.yml's build_fixture_stats for why the
+          # live endpoint alone isn't enough). Keyed separately from the
+          # existing gist's stats so a fixture that failed to fetch this
+          # run can't leave a partial gw entry mixed with stale data.
+          stats_rebuilt = {}
           for i, p in enumerate(players, 1):
               pid = p["id"]
               url = f"https://fantasy.premierleague.com/api/element-summary/{pid}/"
@@ -52,23 +79,30 @@ jobs:
               for h in summ.get("history", []):
                   gw = h["round"]
                   if gw in finished_gws:
-                      stats.setdefault(str(gw), {}).setdefault(str(pid), []).append(h)
+                      stats_rebuilt.setdefault(str(gw), {}).setdefault(str(pid), []).append(h)
               if i % 50 == 0:
                   print(f"Processed {i} players...")
+
+          # Merge into the existing gist rather than replacing it outright —
+          # only overwrite the finished-GW keys just rebuilt. This leaves
+          # the currently in-progress gameweek (written by fpl-live.yml
+          # every 10 min) untouched, so a scheduled run of this workflow
+          # can't blank it out while it's still being played.
+          existing = load_gist_json()
+          existing_stats = existing.get("stats", {})
+          existing_stats.update(stats_rebuilt)
 
           # Bundle everything into single dataset
           data = {
               "fixtures": fixtures,
               "badge_template": "https://resources.premierleague.com/premierleague/badges/70/t{}.png",
               "bootstrap": bootstrap,   # include bootstrap snapshot too
-              "stats": stats
+              "stats": existing_stats,
           }
 
           # Save to gist
-          gist_url = f"https://api.github.com/gists/{GIST_ID}"
-          gh_headers = {"Authorization": f"Bearer {GIST_TOKEN}"}
           payload = {"files": {"fpl_stats.json": {"content": json.dumps(data, indent=2)}}}
           resp = requests.patch(gist_url, headers=gh_headers, json=payload)
           resp.raise_for_status()
-          print("✅ Seeded fpl_stats.json with fixtures, badges, bootstrap, and past GW stats")
+          print(f"✅ Seeded fpl_stats.json with fixtures, badges, bootstrap, and {len(stats_rebuilt)} finished GW(s) of stats")
           EOF
