@@ -41,18 +41,56 @@ jobs:
               else:
                   return json.loads(file_info["content"])
 
-          def build_fixture_stats(player):
+          def build_bps_by_fixture(fixtures):
+              """{fixture_id: {player_id: bps}} — the live event/.../live/
+              endpoint's `explain` block only carries the identifiers that
+              directly explain points (minutes, goals, cards, etc.); bps
+              isn't one of them, so it's never present there. The fixtures
+              endpoint reports it separately, genuinely broken out per
+              fixture (not just a GW total), which is what actually makes
+              it possible to get bps right on a double gameweek."""
+              out = {}
+              for fx in fixtures:
+                  fid = fx.get("id")
+                  for stat in fx.get("stats", []):
+                      if stat.get("identifier") != "bps":
+                          continue
+                      for side in ("h", "a"):
+                          for entry in stat.get(side, []):
+                              pid = entry.get("element")
+                              if pid is not None:
+                                  out.setdefault(fid, {})[pid] = entry.get("value", 0)
+              return out
+
+          def build_fixture_stats(player, bps_by_fixture):
               explain = player.get("explain", [])
+              top = player.get("stats", {}) or {}
+              # expected_goals/assists/goals_conceded aren't broken out per
+              # fixture anywhere in the public API — only a GW-total is
+              # available. Safe to attach to the single fixture when
+              # there's only one this GW; on a genuine double gameweek
+              # there's no way to split it, so leave it off rather than
+              # guess (and risk fatzone's per-GW totals, which sum across
+              # fixture rows, double-counting a GW-total value).
+              xstat_keys = ("expected_goals", "expected_assists", "expected_goals_conceded")
               if not explain:
-                  return [player.get("stats", {})]
+                  return [top]
               result = []
               for entry in explain:
-                  per_fixture = {"fixture": entry.get("fixture")}
+                  fid = entry.get("fixture")
+                  per_fixture = {"fixture": fid}
                   for stat in entry.get("stats", []):
                       identifier = stat.get("identifier")
                       if identifier:
                           per_fixture[identifier] = stat.get("value", 0)
+                  bps = bps_by_fixture.get(fid, {}).get(player.get("id"))
+                  if bps is not None:
+                      per_fixture["bps"] = bps
                   result.append(per_fixture)
+              if len(result) == 1:
+                  for key in xstat_keys:
+                      if key in top:
+                          result[0][key] = top[key]
               return result
 
           # ---------------- Load existing stats ----------------
@@ -86,9 +124,26 @@ jobs:
               else:
                   try:
                       live = r.json()
+
+                      # Per-fixture bps (see build_bps_by_fixture) — best effort,
+                      # falls back to no bps rather than blocking the rest of
+                      # the update if this particular fetch has a problem.
+                      bps_by_fixture = {}
+                      try:
+                          fr = requests.get(
+                              "https://fantasy.premierleague.com/api/fixtures/",
+                              params={"event": gw_id}, headers=headers, timeout=30,
+                          )
+                          if fr.status_code == 200:
+                              bps_by_fixture = build_bps_by_fixture(fr.json())
+                          else:
+                              print(f"⚠️ Fixtures fetch for bps failed ({fr.status_code}), leaving bps as-is")
+                      except Exception:
+                          print("⚠️ Invalid JSON fetching fixtures for bps, leaving bps as-is")
+
                       stats.setdefault("stats", {})
                       stats["stats"][str(gw_id)] = {
-                          str(p["id"]): build_fixture_stats(p)
+                          str(p["id"]): build_fixture_stats(p, bps_by_fixture)
                           for p in live.get("elements", [])
                       }
                   except Exception:
